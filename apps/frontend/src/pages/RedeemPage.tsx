@@ -3,7 +3,7 @@
 // - สำเร็จ -> refresh สถานะ user แล้วไปหน้าหลัก
 // - ผิดพลาด -> แสดงข้อความ error (map จาก ApiError)
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { RedeemBody, RedeemResponse } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -29,7 +29,11 @@ function errorMessage(err: unknown): string {
 
 export function RedeemPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { refresh } = useAuth();
+  // หน้าที่ user ตั้งใจจะไป ก่อนถูกเด้งมาเติมบัตร (เช่น /watch/<slug>) — เด้งกลับหลังเติมสำเร็จ
+  const fromPath =
+    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +57,8 @@ export function RedeemPage() {
       // อัปเดตสถานะ user (เพื่อให้ isActive เป็น true) ก่อนเด้งหน้า
       await refresh();
       setSuccess(`เติมบัตรสำเร็จ! เพิ่มสิทธิ์ใช้งาน ${res.daysAdded} วัน`);
-      // เด้งไปหน้าหลักหลังเติมสำเร็จ
-      navigate('/', { replace: true });
+      // เด้งกลับหน้าที่ user ตั้งใจจะไป (เช่นหน้าดูหนัง) ถ้าไม่มีก็ไปหน้าหลัก
+      navigate(fromPath, { replace: true });
     } catch (e) {
       setError(errorMessage(e));
     } finally {

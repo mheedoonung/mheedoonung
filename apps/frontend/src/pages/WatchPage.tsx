@@ -6,7 +6,7 @@
 //      ถ้าได้ 409 = บัญชีถูกเปิดจากอีกอุปกรณ์ -> หยุดเล่น + แจ้งผู้ใช้
 //   5) ออกจากหน้า -> POST /playback/stop (best-effort)
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import type { PlaybackTokens } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 
@@ -15,6 +15,7 @@ type Phase = 'loading' | 'playing' | 'kicked' | 'error';
 export function WatchPage() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [phase, setPhase] = useState<Phase>('loading');
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('');
@@ -84,8 +85,8 @@ export function WatchPage() {
     } catch (e) {
       if (!aliveRef.current) return;
       if (e instanceof ApiClientError && e.status === 403) {
-        // ยังไม่มีบัตร active -> ไปหน้าเติมบัตร
-        navigate('/redeem', { replace: true });
+        // ยังไม่มีบัตร active -> ไปหน้าเติมบัตร (เก็บหน้านี้ไว้เพื่อเด้งกลับหลังเติมสำเร็จ)
+        navigate('/redeem', { state: { from: location }, replace: true });
         return;
       }
       setMessage(

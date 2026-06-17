@@ -13,7 +13,7 @@ import {
 } from 'react';
 import type { MeResponse, PublicUser } from '@mheedoonung/shared';
 import { api } from '../api/client';
-import { loginWithLine } from '../lib/lineLogin';
+import { loginWithLine, tryLiffAutoLogin } from '../lib/lineLogin';
 
 // รูปร่างของ context ที่เปิดให้ component ใช้
 interface AuthContextValue {
@@ -52,11 +52,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      // 1) มี session อยู่แล้วไหม
       try {
         const res = await api.get<MeResponse>('/me');
-        if (active) setUser(res.user);
+        if (res.user) {
+          if (active) {
+            setUser(res.user);
+            setLoading(false);
+          }
+          return;
+        }
       } catch {
-        if (active) setUser(null);
+        // ยังไม่ login -> ไปลอง LIFF ต่อ
+      }
+      // 2) ยังไม่ login -> ถ้าเข้าผ่าน LINE in-app browser (LIFF) ลอง auto-login แบบเงียบ
+      //    (ไม่ใช่ LIFF / ไม่ได้ตั้ง LIFF ID -> คืน null, ตกไปหน้า login ตามปกติ)
+      try {
+        const liffRes = await tryLiffAutoLogin();
+        if (active && liffRes?.user) setUser(liffRes.user);
+      } catch {
+        // เงียบ
       } finally {
         if (active) setLoading(false);
       }

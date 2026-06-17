@@ -47,3 +47,21 @@ export async function loginWithLine(): Promise<MeResponse | void> {
   // web OAuth — ให้ backend เป็นคนสร้าง state + redirect ไป LINE
   window.location.href = `${api.baseUrl}/auth/line/login`;
 }
+
+// auto-login แบบ "เงียบ" ตอนเปิดแอป — ใช้เมื่อเข้าผ่าน LINE in-app browser (LIFF)
+// - ถ้าอยู่ใน LIFF และ login LINE อยู่แล้ว -> ดึง idToken ส่ง backend ตั้ง session ให้เลย (ไม่ต้องกดปุ่ม)
+// - ถ้ายังไม่ login LINE ใน LIFF จะ "ไม่" สั่ง liff.login() (กัน redirect loop ตอน boot) -> คืน null ให้ไปหน้า login ปกติ
+// - ถ้าไม่ได้ตั้ง LIFF ID / ไม่ได้อยู่ใน LIFF / init fail -> คืน null เงียบ ๆ (ใช้ web OAuth ตามเดิม)
+export async function tryLiffAutoLogin(): Promise<MeResponse | null> {
+  if (!shouldUseLiff()) return null;
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) return null;
+    const idToken = liff.getIDToken();
+    if (!idToken) return null;
+    return await api.post<MeResponse>('/auth/line', { idToken });
+  } catch {
+    // ไม่อยู่ใน LIFF context / init fail -> เงียบ ปล่อยให้ใช้ web OAuth
+    return null;
+  }
+}
