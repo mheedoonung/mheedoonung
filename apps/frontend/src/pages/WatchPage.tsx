@@ -131,6 +131,7 @@ export function WatchPage() {
           //   หมายเหตุ: เป็น cosmetic เท่านั้น — กัน rip จริงไม่ได้ (ดูดผ่าน devtools/yt-dlp ได้) ต้อง DRM ถึงจะกันจริง
           <MediaPlayer
             ref={playerRef}
+            className="mdn-player"
             src={{ src: fileUrl, type: 'video/mp4' }}
             autoPlay
             playsInline
@@ -144,7 +145,6 @@ export function WatchPage() {
             }}
             onContextMenu={(e) => e.preventDefault()}
             onError={() => setMessage('โหลดวิดีโอมีปัญหา (ตรวจว่า video-worker ทำงานและไฟล์อยู่บน R2)')}
-            style={styles.video}
           >
             <MediaProvider />
             <DefaultVideoLayout icons={defaultLayoutIcons} />
@@ -179,19 +179,20 @@ export function WatchPage() {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column' as const },
+  page: { height: '100dvh', minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column' as const },
   bar: { padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   back: { color: '#fff', textDecoration: 'none', fontSize: 15 },
   barLogo: { width: 36, height: 36, objectFit: 'contain' as const },
   stage: {
     flex: 1,
+    minHeight: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative' as const,
   },
   center: { color: '#bbb' },
-  video: { width: '100%', maxHeight: '85vh', background: '#000' },
+  video: { width: '100%', maxWidth: 1100, maxHeight: '90vh', margin: '0 auto', background: '#000' },
   overlay: { textAlign: 'center' as const, padding: 24 },
   overlayTitle: { fontSize: 20, fontWeight: 700, margin: '0 0 8px' },
   overlayNote: { color: '#bbb', margin: '0 0 16px' },

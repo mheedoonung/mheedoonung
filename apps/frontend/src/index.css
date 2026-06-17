@@ -23,3 +23,18 @@ body {
 button:disabled {
   cursor: not-allowed;
 }
+
+/* Vidstack player (หน้าดูหนัง) — ให้เต็มพื้นที่จอ แล้ววิดีโอ fit ตามสัดส่วนจริง
+   (override default aspect-ratio 16/9 ของ Vidstack เพื่อรองรับหนังแนวตั้ง/แนวนอน) */
+.mdn-player {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  aspect-ratio: auto !important;
+  background: #000;
+}
+.mdn-player video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
