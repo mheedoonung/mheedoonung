@@ -1,0 +1,17 @@
+{
+  "name": "mheedoonung",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "cd apps/backend && bun --watch src/index.ts",
+    "dev:frontend": "cd apps/frontend && bunx vite",
+    "dev:worker": "cd apps/video-worker && bun run dev",
+    "dev": "bun run dev:backend",
+    "seed": "cd apps/backend && bun run src/scripts/seed.ts"
+  }
+}

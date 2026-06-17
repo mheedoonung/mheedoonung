@@ -1,0 +1,84 @@
+# Deploy แบบ co-located: backend (Bun/Elysia) + MongoDB บน host เดียว (2 vCPU / 8GB)
+# frontend = static (Cloudflare Pages), video-worker = Cloudflare — ไม่อยู่บน host นี้
+# รัน:  docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d   (จาก repo root)
+#
+# resource split (2 vCPU / 8GB):
+#   mongo      : cpu 1.0  / mem 3g   (cache 1.5g + overhead)  ← service ที่ latency-sensitive สุด
+#   backend    : cpu 0.8  / mem 1g   (Bun single-thread, เบา)
+#   cloudflared: cpu 0.1  / mem 256m
+#   เหลือ ~0.1 cpu + ~3.7g ให้ OS/page cache (ช่วย mongo journal/checkpoint)
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # ไม่ publish port ออก host — เข้าถึงได้เฉพาะ service ในเครือข่าย compose (mongo:27017)
+    command:
+      - "--wiredTigerCacheSizeGB"
+      - "1.5"            # cap cache เอง (dataset เล็ก แต่กัน mongo เดา host RAM แล้ว OOM)
+      - "--maxConns"
+      - "1000"           # กัน connection storm
+    environment:
+      # root user — ใช้สำหรับ admin/healthcheck เท่านั้น (backend ใช้ appuser ที่ init สร้าง)
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: mheedoonung
+      # ส่งต่อให้ init script สร้าง appuser
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    cpus: 1.0
+    mem_limit: 3g
+    healthcheck:
+      # ping เรียกได้โดยไม่ต้อง auth (pre-auth command) — ไม่ต้องใส่ creds ใน healthcheck
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    build:
+      context: ..                       # repo root (ต้องเห็น packages/shared + apps/backend + bun.lock)
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # ไม่ publish port — cloudflared (หรือ reverse proxy) เข้าถึงผ่านเครือข่าย compose (backend:3000)
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # backend ต่อ mongo ภายในเครือข่าย compose ด้วย appuser (ไม่ใช่ root)
+      MONGODB_URI: "mongodb://appuser:${MONGO_APP_PASSWORD}@mongo:27017/mheedoonung?authSource=mheedoonung"
+      MONGODB_DB: mheedoonung
+    env_file:
+      - ./backend.env                   # เฉพาะ secret ของ backend (ไม่มี mongo root / R2 keys) — ดู backend.env.example
+    cpus: 0.8
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # (ออปชัน) Cloudflare Tunnel — expose backend ออกเป็น https://api.your-domain.com
+  #   - ไม่ต้องเปิด inbound port บน host, ไม่ต้องจัดการ TLS cert เอง
+  #   - ทำให้ backend เห็น cf-connecting-ip เดียวกับ video-worker -> ENFORCE_IP ใช้ได้ตรงกัน
+  #   ตั้ง public hostname ใน Cloudflare Zero Trust: api.your-domain.com -> http://backend:3000
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
+    depends_on:
+      backend:
+        condition: service_healthy   # รอ backend ตอบ /health ก่อนเปิด tunnel (ลด 502 ช่วง deploy)
+    cpus: 0.1
+    mem_limit: 256m
+
+volumes:
+  mongo-data:

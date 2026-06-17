@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mheedoonung — ภาพรวมระบบ (เน้น video-worker)</title>
+<style>
+  :root{
+    --fe:#2563eb; --be:#16a34a; --db:#0d9488; --wk:#ea580c; --r2:#7c3aed; --line:#06C755; --danger:#dc2626;
+    --ink:#1f2937; --muted:#6b7280; --bg:#f7f8fa; --card:#fff; --border:#e5e7eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Thai",Tahoma,sans-serif;line-height:1.6}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:30px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 28px}
+  h2{font-size:21px;margin:40px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+  .lead{color:var(--muted);margin:-6px 0 16px;font-size:14px}
+  /* chips */
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;color:#fff;font-size:13px;font-weight:600}
+  .chip .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.85)}
+  .b-fe{background:var(--fe)} .b-be{background:var(--be)} .b-db{background:var(--db)}
+  .b-wk{background:var(--wk)} .b-r2{background:var(--r2)} .b-line{background:var(--line)}
+  /* component map */
+  .map{display:grid;grid-template-columns:1fr;gap:14px;background:var(--card);border:1px solid var(--border);
+    border-radius:14px;padding:20px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  .node{border:2px solid;border-radius:12px;padding:10px 14px;background:#fff;min-width:120px;text-align:center}
+  .node b{display:block;font-size:14px}
+  .node small{color:var(--muted);font-size:11.5px}
+  .n-fe{border-color:var(--fe)} .n-be{border-color:var(--be)} .n-db{border-color:var(--db)}
+  .n-wk{border-color:var(--wk)} .n-r2{border-color:var(--r2)} .n-line{border-color:var(--line)}
+  .arrow{color:var(--muted);font-size:22px;font-weight:700}
+  .arrow small{display:block;font-size:10px;font-weight:500;color:var(--muted);text-align:center}
+  .free{color:var(--r2);font-weight:700}
+  /* steps */
+  .steps{display:flex;flex-direction:column;gap:0}
+  .step{display:flex;gap:14px;position:relative;padding-bottom:18px}
+  .step:not(:last-child)::before{content:"";position:absolute;left:15px;top:34px;bottom:-2px;width:2px;background:var(--border)}
+  .num{flex:0 0 32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;display:flex;
+    align-items:center;justify-content:center;font-weight:700;font-size:15px;z-index:1}
+  .step.wk .num{background:var(--wk)}
+  .step-body{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;flex:1}
+  .step.wk .step-body{border-color:var(--wk);background:#fff7ed}
+  .step-body .who{font-size:11.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+  .step-body h4{margin:2px 0 4px;font-size:15.5px}
+  .step-body p{margin:0;font-size:13.5px;color:#374151}
+  code{background:#eef1f4;padding:1px 6px;border-radius:5px;font-size:12.5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  /* two-col cards */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .card.wk{border-color:var(--wk)}
+  .card h3{margin:0 0 8px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--wk);color:#fff}
+  .checklist{margin:0;padding:0;list-style:none}
+  .checklist li{padding:5px 0 5px 24px;position:relative;font-size:13.5px;border-top:1px dashed var(--border)}
+  .checklist li:first-child{border-top:none}
+  .checklist li::before{content:"✓";position:absolute;left:0;color:var(--be);font-weight:700}
+  /* grant token */
+  .token{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px;font-family:ui-monospace,Menlo,monospace;
+    font-size:12.5px;overflow-x:auto}
+  .token .p1{color:#7dd3fc} .token .p2{color:#fca5a5} .token .lbl{color:#94a3b8}
+  .grant-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:12px}
+  .gf{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:12.5px}
+  .gf b{font-family:ui-monospace,Menlo,monospace;color:var(--wk)}
+  /* secure */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .panel{border-radius:12px;padding:16px;border:1px solid}
+  .ok{background:#f0fdf4;border-color:#bbf7d0}
+  .no{background:#fef2f2;border-color:#fecaca}
+  .panel h3{margin:0 0 8px;font-size:15px}
+  .panel ul{margin:0;padding-left:18px;font-size:13.5px}
+  .panel li{margin:4px 0}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13px;margin-top:14px}
+  .foot{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+  @media(max-width:720px){.cols,.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🎬 mheedoonung — ภาพรวมระบบ</h1>
+  <p class="sub">เว็บดูหนังจาก Cloudflare R2 · login ผ่าน LINE · ปลดล็อกด้วย “บัตรเติมเงิน” · ป้องกันวิดีโอด้วย video-worker (v2)</p>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <span class="chip b-line"><span class="dot"></span>LINE — ยืนยันตัวตน</span>
+    <span class="chip b-fe"><span class="dot"></span>Frontend (React) — หน้าจอ</span>
+    <span class="chip b-be"><span class="dot"></span>Backend (Elysia) — สมอง/ออกตั๋ว</span>
+    <span class="chip b-db"><span class="dot"></span>MongoDB — ข้อมูล</span>
+    <span class="chip b-wk"><span class="dot"></span>video-worker — ยามเฝ้า R2</span>
+    <span class="chip b-r2"><span class="dot"></span>R2 — โกดังไฟล์หนัง</span>
+  </div>
+
+  <!-- ARCHITECTURE MAP -->
+  <h2>1) ภาพรวม — ใครคุยกับใคร</h2>
+  <p class="lead">เส้นทาง “ข้อมูล/คำสั่ง” ผ่าน backend · เส้นทาง “ไฟล์วิดีโอ” แยกไปที่ worker→R2 โดยตรง (ไม่ผ่าน backend)</p>
+  <div class="map">
+    <div class="row">
+      <div class="node n-line"><b>LINE</b><small>OAuth / LIFF</small></div>
+      <span class="arrow">→</span>
+      <div class="node n-fe"><b>Frontend</b><small>เบราว์เซอร์ / Pages</small></div>
+      <span class="arrow">→<small>คำสั่ง (cookie)</small></span>
+      <div class="node n-be"><b>Backend</b><small>auth · บัตร · ออกตั๋ว</small></div>
+      <span class="arrow">→</span>
+      <div class="node n-db"><b>MongoDB</b><small>users·cards·movies</small></div>
+    </div>
+    <div class="row">
+      <div class="node n-fe"><b>&lt;video&gt;</b><small>ขอไฟล์ + แนบ cookie ตั๋ว</small></div>
+      <span class="arrow">→</span>
+      <div class="node n-wk"><b>video-worker</b><small>ตรวจตั๋ว → ปล่อยไฟล์</small></div>
+      <span class="arrow">→<small class="free">egress ฟรี</small></span>
+      <div class="node n-r2"><b>R2</b><small>movies/*.mp4</small></div>
+    </div>
+  </div>
+
+  <!-- FLOW 1 -->
+  <h2>2) Flow A — เข้าระบบ &amp; เติมบัตร</h2>
+  <div class="steps">
+    <div class="step"><div class="num">1</div><div class="step-body">
+      <div class="who">Frontend → LINE → Backend</div>
+      <h4>login</h4>
+      <p>ผู้ใช้ login ผ่าน LINE → backend ยืนยัน id_token → ออก <b>session cookie</b> ของเรา (ใช้ดูว่าใครคือใคร)</p>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="step-body">
+      <div class="who">Admin → Backend → MongoDB</div>
+      <h4>admin สร้างบัตร</h4>
+      <p>admin สร้างรหัสบัตร (กำหนดจำนวนวัน) เก็บใน <code>cards</code> สถานะ <code>unused</code></p>
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="step-body">
+      <div class="who">Frontend → Backend</div>
+      <h4>ผู้ใช้เติมบัตร</h4>
+      <p><code>POST /cards/redeem</code> → บัตรเปลี่ยนเป็น <code>redeemed</code> (ครั้งเดียว) → ตั้ง <code>accessExpiresAt = วันนี้ + N วัน</code> ในบัญชีผู้ใช้</p>
+    </div></div>
+    <div class="step"><div class="num">4</div><div class="step-body">
+      <div class="who">Backend</div>
+      <h4>มีสิทธิ์แล้ว (active)</h4>
+      <p>ตราบที่ <code>accessExpiresAt</code> ยังไม่ถึง = ดูหนังได้ · หมดอายุ → ต้องเติมบัตรใหม่ (เติมซ้ำ = ต่อวันสะสม)</p>
+    </div></div>
+  </div>
+
+  <!-- FLOW 2 -->
+  <h2>3) Flow B — ดูหนัง (หัวใจของระบบ) 🔑</h2>
+  <p class="lead">ขั้นที่ไฮไลต์สีส้ม = งานของ video-worker</p>
+  <div class="steps">
+    <div class="step"><div class="num">1</div><div class="step-body">
+      <div class="who">Frontend → Backend</div>
+      <h4>กดเล่น → ขอ “ตั๋ว”</h4>
+      <p><code>POST /playback/start</code> → backend เช็ค <b>บัตร active?</b> + <b>concurrency (1 เครื่อง)?</b> → ถ้าผ่าน <b>เซ็น grant</b> (HMAC) แล้วคืน <code>authUrl</code> + <code>fileUrl</code></p>
+    </div></div>
+    <div class="step wk"><div class="num">2</div><div class="step-body">
+      <div class="who">Frontend → video-worker</div>
+      <h4>เอาตั๋วไปแลก cookie</h4>
+      <p>frontend <code>fetch(authUrl)</code> → worker <b>ตรวจลายเซ็น+วันหมดอายุ+IP</b> ของ grant → ถ้าผ่าน <b>Set-Cookie</b> (HttpOnly, อายุสั้น ~2 นาที)</p>
+    </div></div>
+    <div class="step wk"><div class="num">3</div><div class="step-body">
+      <div class="who">&lt;video&gt; → video-worker → R2</div>
+      <h4>โหลด/เล่นไฟล์ (Range)</h4>
+      <p><code>&lt;video src=fileUrl&gt;</code> ยิง Range request พร้อม cookie อัตโนมัติ → worker ตรวจ cookie + <b>เช็คว่าตั๋วตรงกับไฟล์ที่ขอ</b> → ดึงช่วง byte จาก R2 → ส่ง <b>206 Partial Content</b> → เล่น/seek ได้</p>
+    </div></div>
+    <div class="step"><div class="num">4</div><div class="step-body">
+      <div class="who">Frontend → Backend → video-worker</div>
+      <h4>ต่ออายุ (heartbeat) ทุก ~60 วิ</h4>
+      <p><code>POST /playback/refresh</code> → grant ใหม่ → set cookie ใหม่ (เนียน ไม่ต้องเปลี่ยน src) · ถ้าเครื่องอื่นมาเล่นบัญชีเดียวกัน → เครื่องเก่า refresh ไม่ผ่าน (<b>409</b>) = <b>ถูกเตะ</b></p>
+    </div></div>
+    <div class="step"><div class="num">5</div><div class="step-body">
+      <div class="who">ออกจากหน้า</div>
+      <h4>ปิดสตรีม</h4>
+      <p><code>POST /playback/stop</code> เคลียร์สถานะ · cookie หมดอายุเองใน ~2 นาที</p>
+    </div></div>
+  </div>
+
+  <!-- WORKER DEEP DIVE -->
+  <h2>4) เจาะลึก video-worker — ทำ 2 งาน</h2>
+  <div class="cols">
+    <div class="card wk">
+      <h3><span class="tag">GET</span> /__auth?token=…</h3>
+      <ul class="checklist">
+        <li>อ่าน grant จาก query</li>
+        <li>คำนวณ HMAC ใหม่ด้วย <code>VIDEO_GRANT_SECRET</code> แล้วเทียบลายเซ็น (constant-time)</li>
+        <li>เช็ค <code>exp</code> ยังไม่หมด</li>
+        <li>เช็ค IP (ถ้าเปิด ENFORCE_IP)</li>
+        <li>ถ้าผ่าน → <b>Set-Cookie</b> <code>mdn_video</code> (HttpOnly·Secure·SameSite=None) อายุ = เวลาที่เหลือของ grant</li>
+      </ul>
+    </div>
+    <div class="card wk">
+      <h3><span class="tag">GET</span> /&lt;r2Key&gt; (ไฟล์)</h3>
+      <ul class="checklist">
+        <li>อ่าน grant จาก cookie → verify เหมือนข้างซ้าย</li>
+        <li><b>เช็ค <code>grant.key === ไฟล์ที่ขอ</code></b> (กันเอาตั๋วเรื่อง A ไปดึงเรื่อง B)</li>
+        <li>เช็ค IP (ถ้าเปิด)</li>
+        <li>แปลง <code>Range:</code> → ดึงเฉพาะช่วง byte จาก R2 binding</li>
+        <li>ส่ง <b>206</b> + <code>Content-Range</code> (รองรับ seek) — bytes วิ่ง R2→client ตรง</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- GRANT ANATOMY -->
+  <h2>5) “ตั๋ว” (grant token) หน้าตาเป็นยังไง</h2>
+  <p class="lead">คล้าย JWT แบบย่อ: <b>ข้อมูล</b> + <b>ลายเซ็น HMAC-SHA256</b> เซ็นด้วย secret ที่ backend &amp; worker รู้ร่วมกันเท่านั้น</p>
+  <div class="token">
+    <span class="lbl"># base64url(JSON ข้อมูล)</span><span class="p1">.</span><span class="lbl">base64url(ลายเซ็น)</span><br>
+    <span class="p1">eyJ2IjoxLCJzdWIiOiJ1c2VyMTIzIiwia2V5IjoibW92aWVzL2R1YXktcmFrLi4u</span><span style="color:#fff">.</span><span class="p2">KzFryYsQRig8QC851XQNsq6nuCXMJkdvG-NWSBKtAKk</span>
+  </div>
+  <div class="grant-fields">
+    <div class="gf"><b>sub</b> = ใคร (userId)</div>
+    <div class="gf"><b>sid</b> = stream id (กันแชร์บัญชี)</div>
+    <div class="gf"><b>key</b> = ดูได้เฉพาะไฟล์นี้</div>
+    <div class="gf"><b>ip</b> = ผูก IP (option)</div>
+    <div class="gf"><b>exp</b> = หมดอายุ (~2 นาที)</div>
+  </div>
+  <div class="note">🔐 ถ้าใครแก้ข้อมูลในตั๋วแม้ตัวเดียว → ลายเซ็นไม่ตรง → worker ปฏิเสธ และตั๋วปลอม (ไม่รู้ secret) เซ็นเองไม่ได้</div>
+
+  <!-- SECURITY -->
+  <h2>6) ทำไมถึงปลอดภัย &amp; ประหยัด</h2>
+  <div class="grid2">
+    <div class="panel ok">
+      <h3>✅ ระบบนี้กันได้</h3>
+      <ul>
+        <li><b>egress ฟรี</b>: ไฟล์วิ่ง R2→worker→client บนเครือข่าย Cloudflare ไม่ผ่าน backend</li>
+        <li><b>backend ไม่ถือ key ของ R2</b>: worker เข้าผ่าน binding → backend ถูกเจาะก็เข้า storage ไม่ได้</li>
+        <li><b>ลิงก์แชร์/hotlink</b>: ตั๋วอายุสั้น + ผูก IP + ผูกไฟล์เดียว</li>
+        <li><b>แชร์บัญชี</b>: 1 บัญชี = 1 สตรีม (เปิดเครื่องใหม่เตะเครื่องเก่า)</li>
+      </ul>
+    </div>
+    <div class="panel no">
+      <h3>⚠️ สิ่งที่กันไม่ได้ 100%</h3>
+      <ul>
+        <li>คนที่จ่ายเงิน+login แล้ว ยังใช้เครื่องมือ (เช่น yt-dlp) ดูดไฟล์ของตัวเองได้ — เป็นธรรมชาติของ MP4 ในเบราว์เซอร์</li>
+        <li>ถ้าต้องกัน rip จริงจัง = ต้องใช้ <b>DRM</b> (Widevine/FairPlay) ซึ่งหนัก/แพง — เก็บไว้เป็นเฟสอนาคต</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="foot">mheedoonung · สถาปัตยกรรม v2 (signed grant + Cloudflare Worker + R2) · เอกสารประกอบ: SETUP.md / DEPLOY.md</p>
+</div>
+</body>
+</html>

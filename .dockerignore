@@ -1,0 +1,20 @@
+# กัน build context บวม + กัน secret หลุดเข้า image (build context = repo root)
+# หมายเหตุ: ห้าม ignore apps/*/package.json (Dockerfile ต้อง copy ครบทุก workspace สำหรับ --frozen-lockfile)
+node_modules
+**/node_modules
+.git
+**/dist
+dist
+build
+*.log
+
+# secret / env (ไม่ให้เข้า image)
+**/.env
+**/.env.local
+deploy/.env
+deploy/backend.env
+apps/video-worker/.dev.vars
+
+# misc
+.DS_Store
+**/*.tsbuildinfo

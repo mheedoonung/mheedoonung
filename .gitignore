@@ -1,0 +1,22 @@
+# dependencies
+node_modules
+
+# env
+.env
+.env.local
+apps/backend/.env
+apps/frontend/.env
+apps/video-worker/.dev.vars
+deploy/.env
+deploy/backend.env
+
+# build output
+dist
+build
+
+# logs
+*.log
+
+# macOS
+.DS_Store
+.playwright-mcp/*

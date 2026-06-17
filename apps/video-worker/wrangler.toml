@@ -1,0 +1,29 @@
+# Cloudflare Worker config สำหรับ video-worker (เสิร์ฟไฟล์หนังจาก R2 + ตรวจ grant)
+name = "mheedoonung-video"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# ผูก R2 bucket ที่เก็บไฟล์หนัง (เปลี่ยน bucket_name ให้ตรงกับ bucket จริงของคุณ)
+[[r2_buckets]]
+binding = "MOVIES_BUCKET"
+bucket_name = "mheedoonung-movies"
+# remote = true: ให้ `wrangler dev` (local) อ่าน R2 "จริง" ผ่าน binding — worker ยังรัน local ปกติ
+#   เฉพาะ R2 ที่ชี้ remote, ไม่ต้องมี workers.dev subdomain (ต่างจาก --remote) · ต้อง `wrangler login` ก่อน
+#   อยากเทสต์ offline ล้วน (R2 local) ให้คอมเมนต์บรรทัดนี้ออก แล้วใช้ `wrangler r2 object put --local`
+remote = true
+
+[vars]
+COOKIE_NAME = "mdn_video"
+# origin ของ frontend (ใช้ทำ CORS ที่ /__auth) — ตั้งให้ตรงกับโดเมนเว็บจริง
+# รองรับหลาย origin ได้ด้วยการคั่นด้วย comma เช่น "https://a.com,https://b.com"
+# *สำคัญ*: ใน production ต้อง override ค่านี้เสมอ (ค่าด้านล่างเป็น dev เท่านั้น)
+#          ถ้า ENVIRONMENT=production แต่ ALLOWED_ORIGIN ว่าง worker จะปฏิเสธ /__auth
+ALLOWED_ORIGIN = "http://localhost:5173"
+# 'true' = บังคับเทียบ IP ของผู้ขอกับ IP ใน grant (กันเอาลิงก์/cookie ไปใช้ข้ามเครื่อง)
+ENFORCE_IP = "false"
+# 'production' = เปิด guard บังคับให้ตั้ง ALLOWED_ORIGIN (override ใน prod env)
+ENVIRONMENT = "development"
+
+# หมายเหตุ: VIDEO_GRANT_SECRET เป็น "secret" ไม่ตั้งในไฟล์นี้
+#   - dev:  ใส่ใน apps/video-worker/.dev.vars (ดู .dev.vars.example) ต้องตรงกับ backend
+#   - prod: ตั้งด้วย `bunx wrangler secret put VIDEO_GRANT_SECRET`

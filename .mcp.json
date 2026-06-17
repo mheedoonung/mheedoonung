@@ -1,0 +1,30 @@
+{
+    "mcpServers": {
+        "coolify-mhee": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@masonator/coolify-mcp"
+            ],
+            "env": {
+                "COOLIFY_ACCESS_TOKEN": "2|iG7EpHA7nJf2NRExwbwuNha5q4PpqfhjLgxop14M4006c486",
+                "COOLIFY_BASE_URL": "https://coolify.mheedoonung.com/"
+            }
+        },
+        "ssh-mcp-brpoc": {
+            "command": "npx",
+            "args": [
+                "ssh-mcp",
+                "-y",
+                "--",
+                "--host=76.13.221.85",
+                "--port=22",
+                "--user=root",
+                "--sudoPassword=@eDf#8d7UNs#qQOn",
+                "--key=/Users/paitoonarayasatjapong/.ssh/id_ed25519",
+                "--timeout=120000",
+                "--maxChars=none"
+            ]
+        }
+    }
+}

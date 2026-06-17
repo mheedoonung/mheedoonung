@@ -1,0 +1,25 @@
+/* สไตล์พื้นฐานของทั้งแอป — เรียบ ๆ ยังไม่เน้นสวย */
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ปุ่มทั่วไป: ปรับ cursor เมื่อ disabled ให้สอดคล้องกับ inline style */
+button:disabled {
+  cursor: not-allowed;
+}
