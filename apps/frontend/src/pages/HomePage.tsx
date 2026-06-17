@@ -49,9 +49,12 @@ export function HomePage() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <div>
-          <strong>{user?.displayName ?? 'ผู้ใช้'}</strong>
-          <span style={styles.expiry}> · สิทธิ์ใช้งานถึง {formatExpiry(user?.accessExpiresAt ?? null)}</span>
+        <div style={styles.brandWrap}>
+          <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.brand} />
+          <div>
+            <strong>{user?.displayName ?? 'ผู้ใช้'}</strong>
+            <span style={styles.expiry}> · สิทธิ์ใช้งานถึง {formatExpiry(user?.accessExpiresAt ?? null)}</span>
+          </div>
         </div>
         <button type="button" onClick={handleLogout} style={styles.logoutButton}>
           ออกจากระบบ
@@ -99,6 +102,8 @@ const styles = {
     flexWrap: 'wrap' as const,
     gap: 8,
   },
+  brandWrap: { display: 'flex', alignItems: 'center', gap: 10 },
+  brand: { width: 40, height: 40, objectFit: 'contain' as const, borderRadius: 8, flexShrink: 0 },
   expiry: { color: '#666', fontSize: 14 },
   logoutButton: {
     padding: '6px 12px',

@@ -34,7 +34,7 @@ export function LoginPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>{APP_NAME}</h1>
+        <img src="/mheedoonung.png" alt={APP_NAME} style={styles.logo} />
         <p style={styles.subtitle}>กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
         <button
           type="button"
@@ -96,6 +96,13 @@ const styles = {
     width: '100%',
   },
   title: { margin: '0 0 8px', fontSize: 24 },
+  logo: {
+    width: 128,
+    height: 128,
+    objectFit: 'contain' as const,
+    display: 'block',
+    margin: '0 auto 16px',
+  },
   subtitle: { margin: '0 0 24px', color: '#666' },
   lineButton: {
     width: '100%',

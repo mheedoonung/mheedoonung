@@ -10,11 +10,12 @@
     "deploy": "bun run build && bunx wrangler pages deploy dist --project-name mheedoonung --branch main --commit-dirty=true"
   },
   "dependencies": {
+    "@line/liff": "^2.24.0",
+    "@mheedoonung/shared": "workspace:*",
+    "@vidstack/react": "^1.15.6",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^6.26.0",
-    "@line/liff": "^2.24.0",
-    "@mheedoonung/shared": "workspace:*"
+    "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
     "vite": "^5.4.0",

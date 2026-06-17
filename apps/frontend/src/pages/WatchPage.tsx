@@ -7,6 +7,10 @@
 //   5) ออกจากหน้า -> POST /playback/stop (best-effort)
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
+import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/react';
+import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
+import '@vidstack/react/player/styles/default/theme.css';
+import '@vidstack/react/player/styles/default/layouts/video.css';
 import type { PlaybackTokens } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 
@@ -20,7 +24,7 @@ export function WatchPage() {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('');
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playerRef = useRef<MediaPlayerInstance | null>(null);
   const streamIdRef = useRef<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const aliveRef = useRef<boolean>(true);
@@ -57,10 +61,10 @@ export function WatchPage() {
     } catch (e) {
       if (!aliveRef.current) return;
       if (e instanceof ApiClientError && e.status === 409) {
-        videoRef.current?.pause();
+        playerRef.current?.pause();
         setPhase('kicked');
       } else if (e instanceof ApiClientError && e.status === 403) {
-        videoRef.current?.pause();
+        playerRef.current?.pause();
         setMessage('สิทธิ์ใช้งานหมดอายุแล้ว');
         setPhase('error');
       } else {
@@ -115,27 +119,36 @@ export function WatchPage() {
         <Link to="/" style={styles.back}>
           ← กลับ
         </Link>
+        <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.barLogo} />
       </div>
 
       <div style={styles.stage}>
         {phase === 'loading' && <p style={styles.center}>กำลังเตรียมวิดีโอ...</p>}
 
         {phase === 'playing' && fileUrl && (
-          <video
-            ref={videoRef}
-            src={fileUrl}
-            controls
+          // Vidstack player + DefaultVideoLayout = controls แบบ custom (ไม่มีปุ่ม download / เมนู native ⋮)
+          // *สำคัญ*: ไม่ตั้ง crossOrigin เพื่อให้ <video> ภายในส่ง cookie ข้าม origin ไป worker (no-cors media)
+          //   หมายเหตุ: เป็น cosmetic เท่านั้น — กัน rip จริงไม่ได้ (ดูดผ่าน devtools/yt-dlp ได้) ต้อง DRM ถึงจะกันจริง
+          <MediaPlayer
+            ref={playerRef}
+            src={{ src: fileUrl, type: 'video/mp4' }}
             autoPlay
             playsInline
-            // ตัดปุ่ม Download + remote playback ออกจากเมนู native, ปิด Picture-in-Picture, กันคลิกขวา
-            // (เป็น "ตัวกันมือใหม่" — ไม่ได้กัน rip จริง ดูหมายเหตุด้านความปลอดภัย)
-            controlsList="nodownload noremoteplayback"
-            disablePictureInPicture
+            // เล่นทันทีที่เข้าหน้า: พยายามเล่นแบบมีเสียงก่อน; ถ้า browser บล็อก autoplay (ไม่มี user gesture)
+            // -> เล่นต่อแบบ muted อัตโนมัติ (เบราว์เซอร์อนุญาตเสมอ) แล้วให้ผู้ใช้กดเปิดเสียงเองทีหลัง
+            onAutoPlayFail={() => {
+              const p = playerRef.current;
+              if (!p) return;
+              p.muted = true;
+              void p.play().catch(() => {});
+            }}
             onContextMenu={(e) => e.preventDefault()}
-            // ไม่ตั้ง crossOrigin เพื่อให้ส่ง cookie ข้าม origin ไป worker (no-cors media)
-            style={styles.video}
             onError={() => setMessage('โหลดวิดีโอมีปัญหา (ตรวจว่า video-worker ทำงานและไฟล์อยู่บน R2)')}
-          />
+            style={styles.video}
+          >
+            <MediaProvider />
+            <DefaultVideoLayout icons={defaultLayoutIcons} />
+          </MediaPlayer>
         )}
 
         {phase === 'kicked' && (
@@ -167,8 +180,9 @@ export function WatchPage() {
 
 const styles = {
   page: { minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column' as const },
-  bar: { padding: '12px 16px' },
+  bar: { padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   back: { color: '#fff', textDecoration: 'none', fontSize: 15 },
+  barLogo: { width: 36, height: 36, objectFit: 'contain' as const },
   stage: {
     flex: 1,
     display: 'flex',

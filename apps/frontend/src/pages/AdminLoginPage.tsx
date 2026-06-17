@@ -38,6 +38,7 @@ export function AdminLoginPage() {
   return (
     <div style={styles.container}>
       <form onSubmit={handleSubmit} style={styles.card}>
+        <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.logo} />
         <h1 style={styles.title}>เข้าสู่ระบบแอดมิน</h1>
         <input
           type="text"
@@ -86,6 +87,7 @@ const styles = {
     maxWidth: 360,
     width: '100%',
   },
+  logo: { width: 72, height: 72, objectFit: 'contain' as const, display: 'block', margin: '0 auto 12px' },
   title: { margin: '0 0 24px', fontSize: 22, textAlign: 'center' as const },
   input: {
     width: '100%',

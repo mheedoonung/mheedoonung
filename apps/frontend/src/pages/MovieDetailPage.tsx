@@ -69,9 +69,12 @@ export function MovieDetailPage() {
       )}
 
       <div style={styles.body}>
-        <Link to="/" style={styles.back}>
-          ← กลับ
-        </Link>
+        <div style={styles.topbar}>
+          <Link to="/" style={styles.back}>
+            ← กลับ
+          </Link>
+          <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.brand} />
+        </div>
 
         <div style={styles.head}>
           <img src={movie.posterUrl} alt={movie.title} style={styles.poster} />
@@ -121,7 +124,9 @@ const styles = {
     filter: 'brightness(0.7)',
   },
   body: { maxWidth: 860, margin: '0 auto', padding: 24 },
-  back: { display: 'inline-block', marginBottom: 16, color: '#555', textDecoration: 'none' },
+  topbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  back: { display: 'inline-block', color: '#555', textDecoration: 'none' },
+  brand: { width: 40, height: 40, objectFit: 'contain' as const, borderRadius: 8 },
   head: { display: 'flex', gap: 20, flexWrap: 'wrap' as const },
   poster: { width: 180, aspectRatio: '2 / 3', objectFit: 'cover' as const, borderRadius: 10, background: '#eee' },
   info: { flex: 1, minWidth: 240 },

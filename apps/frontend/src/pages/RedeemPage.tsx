@@ -69,6 +69,7 @@ export function RedeemPage() {
   return (
     <div style={styles.container}>
       <form onSubmit={handleSubmit} style={styles.card}>
+        <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.logo} />
         <h1 style={styles.title}>เติมบัตรเข้าใช้งาน</h1>
         <p style={styles.subtitle}>กรอกรหัสบัตรเพื่อเปิดสิทธิ์ดูหนัง</p>
         <input
@@ -111,6 +112,7 @@ const styles = {
     maxWidth: 360,
     width: '100%',
   },
+  logo: { width: 80, height: 80, objectFit: 'contain' as const, display: 'block', margin: '0 auto 12px' },
   title: { margin: '0 0 8px', fontSize: 22 },
   subtitle: { margin: '0 0 24px', color: '#666' },
   input: {
