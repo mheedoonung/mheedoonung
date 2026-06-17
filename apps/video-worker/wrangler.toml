@@ -4,6 +4,11 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 # ผูก R2 bucket ที่เก็บไฟล์หนัง (เปลี่ยน bucket_name ให้ตรงกับ bucket จริงของคุณ)
+# custom domain ของ worker (เสิร์ฟวิดีโอ) — wrangler จะสร้าง DNS ให้ถ้า zone อยู่ใน Cloudflare
+[[routes]]
+pattern = "video.mheedoonung.com"
+custom_domain = true
+
 [[r2_buckets]]
 binding = "MOVIES_BUCKET"
 bucket_name = "mheedoonung-movies"
@@ -18,11 +23,13 @@ COOKIE_NAME = "mdn_video"
 # รองรับหลาย origin ได้ด้วยการคั่นด้วย comma เช่น "https://a.com,https://b.com"
 # *สำคัญ*: ใน production ต้อง override ค่านี้เสมอ (ค่าด้านล่างเป็น dev เท่านั้น)
 #          ถ้า ENVIRONMENT=production แต่ ALLOWED_ORIGIN ว่าง worker จะปฏิเสธ /__auth
-ALLOWED_ORIGIN = "http://localhost:5173"
+ALLOWED_ORIGIN = "https://app.mheedoonung.com"
+# ALLOWED_ORIGIN = "http://localhost:5173"
 # 'true' = บังคับเทียบ IP ของผู้ขอกับ IP ใน grant (กันเอาลิงก์/cookie ไปใช้ข้ามเครื่อง)
+# เปิดเป็น true หลังทดสอบ E2E แล้ว (ดู SETUP.md checklist)
 ENFORCE_IP = "false"
 # 'production' = เปิด guard บังคับให้ตั้ง ALLOWED_ORIGIN (override ใน prod env)
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
 
 # หมายเหตุ: VIDEO_GRANT_SECRET เป็น "secret" ไม่ตั้งในไฟล์นี้
 #   - dev:  ใส่ใน apps/video-worker/.dev.vars (ดู .dev.vars.example) ต้องตรงกับ backend

@@ -14,6 +14,9 @@ deploy/backend.env
 dist
 build
 
+# wrangler (cloudflare) cache/tmp/state
+.wrangler
+
 # logs
 *.log
 
