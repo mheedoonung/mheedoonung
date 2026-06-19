@@ -7,7 +7,7 @@
 //   5) ออกจากหน้า -> POST /playback/stop (best-effort)
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
-import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/react';
+import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vidstack/react';
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
@@ -22,9 +22,13 @@ export function WatchPage() {
   const location = useLocation();
   const [phase, setPhase] = useState<Phase>('loading');
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  // blob URL ของไฟล์ซับ — เราต้อง fetch ไฟล์ .srt เองด้วย cookie (cross-origin credentialed)
+  //   แล้วทำเป็น blob (same-origin) ส่งให้ player เพราะ vidstack อ่าน track ผ่าน fetch ที่ไม่ได้แนบ cookie ให้
+  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('');
 
   const playerRef = useRef<MediaPlayerInstance | null>(null);
+  const subtitleBlobRef = useRef<string | null>(null);
   const streamIdRef = useRef<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const aliveRef = useRef<boolean>(true);
@@ -32,6 +36,31 @@ export function WatchPage() {
   // เรียก worker /__auth (cross-origin) เพื่อให้ worker ตั้ง cookie ก่อนโหลดไฟล์
   async function primeCookie(authUrl: string): Promise<void> {
     await fetch(authUrl, { method: 'GET', credentials: 'include' });
+  }
+
+  // ปลด blob ซับเก่า (กัน memory leak ตอนเล่นซ้ำ/ออกจากหน้า)
+  function revokeSubtitle(): void {
+    if (subtitleBlobRef.current) {
+      URL.revokeObjectURL(subtitleBlobRef.current);
+      subtitleBlobRef.current = null;
+    }
+  }
+
+  // โหลดไฟล์ซับเองด้วย cookie แล้วทำเป็น blob URL (same-origin) ให้ <Track> ใช้
+  //   ทำแบบ best-effort — ถ้าซับโหลดไม่ได้ ก็ยังเล่นวิดีโอต่อได้ (แค่ไม่มีซับ)
+  async function loadSubtitle(url: string): Promise<void> {
+    try {
+      const res = await fetch(url, { method: 'GET', credentials: 'include' });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      if (!aliveRef.current) return;
+      revokeSubtitle();
+      const objUrl = URL.createObjectURL(blob);
+      subtitleBlobRef.current = objUrl;
+      setSubtitleUrl(objUrl);
+    } catch {
+      // เงียบ — ซับเป็น optional
+    }
   }
 
   function clearTimer(): void {
@@ -85,6 +114,8 @@ export function WatchPage() {
       if (!aliveRef.current) return;
       setFileUrl(tok.fileUrl);
       setPhase('playing');
+      // โหลดซับ (ถ้ามี) — cookie ถูกตั้งจาก primeCookie แล้ว ใช้ grant เดียวกันดึงได้
+      if (tok.subtitleUrl) void loadSubtitle(tok.subtitleUrl);
       scheduleRefresh(tok.refreshInSeconds);
     } catch (e) {
       if (!aliveRef.current) return;
@@ -106,6 +137,7 @@ export function WatchPage() {
     return () => {
       aliveRef.current = false;
       clearTimer();
+      revokeSubtitle();
       // ปิดสตรีมฝั่ง server (best-effort) เมื่อออกจากหน้า
       const sid = streamIdRef.current;
       if (sid) void api.post('/playback/stop', { streamId: sid }).catch(() => {});
@@ -147,6 +179,18 @@ export function WatchPage() {
             onError={() => setMessage('โหลดวิดีโอมีปัญหา (ตรวจว่า video-worker ทำงานและไฟล์อยู่บน R2)')}
           >
             <MediaProvider />
+            {/* ซับแบบ soft (.srt) — vidstack parse SRT ฝั่ง client เองได้ ไม่ต้องแปลงเป็น .vtt
+                หมายเหตุ: ต้องเป็นไฟล์แยก (blob) — soft sub ที่ฝังในไฟล์ MP4 เบราว์เซอร์ไม่ render ให้ */}
+            {subtitleUrl && (
+              <Track
+                src={subtitleUrl}
+                kind="subtitles"
+                type="srt"
+                label="ไทย"
+                lang="th"
+                default
+              />
+            )}
             <DefaultVideoLayout icons={defaultLayoutIcons} />
           </MediaPlayer>
         )}

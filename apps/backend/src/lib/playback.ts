@@ -14,6 +14,7 @@ export interface GrantInput {
   userId: string; // _id ของ user (LINE-bound)
   streamId: string; // id ของ stream ปัจจุบัน (concurrency=1)
   r2Key: string; // object key ของไฟล์บน R2 ที่อนุญาตให้ดึง
+  subtitleR2Key?: string; // object key ของไฟล์ซับ (ถ้ามี) — อนุญาตให้ดึงด้วย grant เดียวกัน
   ip: string; // IP ที่ผูกกับ grant (worker เทียบกับ cf-connecting-ip)
 }
 
@@ -23,9 +24,17 @@ export function newStreamId(): string {
 }
 
 // ออก grant token (HMAC) อายุ = VIDEO_TOKEN_TTL_SECONDS
-export function mintGrant({ userId, streamId, r2Key, ip }: GrantInput): string {
+// subkey: ถ้ามีไฟล์ซับ จะฝัง key ของซับไว้ด้วย เพื่อให้ worker ยอมเสิร์ฟทั้งวิดีโอและซับด้วย grant เดียว
+export function mintGrant({ userId, streamId, r2Key, subtitleR2Key, ip }: GrantInput): string {
   return hmacSign(
-    { v: GRANT_VERSION, sub: userId, sid: streamId, key: r2Key, ip },
+    {
+      v: GRANT_VERSION,
+      sub: userId,
+      sid: streamId,
+      key: r2Key,
+      ...(subtitleR2Key ? { subkey: subtitleR2Key } : {}),
+      ip,
+    },
     env.VIDEO_GRANT_SECRET,
     env.VIDEO_TOKEN_TTL_SECONDS,
   );
@@ -42,6 +51,8 @@ export function buildPlaybackTokens(input: GrantInput): PlaybackTokens {
     authUrl: `${base}/__auth?token=${encodeURIComponent(grant)}`,
     // ไฟล์วิดีโอ — Range request ทุกครั้งจะแนบ cookie ที่ worker set ไว้ (ดูได้ต่อเนื่องโดยไม่ต้องเปลี่ยน src)
     fileUrl: `${base}/${input.r2Key}`,
+    // ไฟล์ซับ (ถ้ามี) — frontend fetch ด้วย credentials:'include' (cookie เดียวกับวิดีโอ) แล้วทำเป็น blob ให้ player
+    ...(input.subtitleR2Key ? { subtitleUrl: `${base}/${input.subtitleR2Key}` } : {}),
     ttlSeconds: ttl,
     // refresh ก่อนหมดอายุครึ่งนึง (อย่างน้อย 15 วิ) เพื่อต่อ cookie แบบเนียน + เช็ค concurrency
     refreshInSeconds: Math.max(15, Math.floor(ttl / 2)),

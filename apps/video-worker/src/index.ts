@@ -104,8 +104,9 @@ async function authorizeFileRequest(
   if (!token) return new Response('unauthorized', { status: 401 });
   const grant = await verifyGrant(token, env.VIDEO_GRANT_SECRET);
   if (!grant) return new Response('unauthorized', { status: 401 });
-  // grant ออกให้เฉพาะไฟล์เดียว — ห้ามเอา grant ของเรื่องหนึ่งไปดึงอีกเรื่อง
-  if (grant.key !== key) return new Response('forbidden', { status: 403 });
+  // grant ออกให้เฉพาะไฟล์ของเรื่องนั้น — ยอมทั้งไฟล์วิดีโอ (key) และไฟล์ซับ (subkey) ที่ฝังมาด้วย
+  // ห้ามเอา grant ของเรื่องหนึ่งไปดึงอีกเรื่อง
+  if (key !== grant.key && key !== grant.subkey) return new Response('forbidden', { status: 403 });
   if (isTrue(env.ENFORCE_IP)) {
     const ip = req.headers.get('cf-connecting-ip') ?? '';
     // fail-closed: ถ้า grant ผูก IP ไว้แต่ดึง client IP ไม่ได้ ให้ปฏิเสธ (ไม่ปล่อยผ่านเงียบ ๆ)
@@ -186,11 +187,15 @@ async function handleFile(req: Request, url: URL, env: Env, cookieName: string):
   const denied = await authorizeFileRequest(req, env, cookieName, key);
   if (denied) return denied;
 
+  // CORS: ไฟล์ซับถูก fetch จาก frontend ด้วย JS (credentials:'include') ซึ่งโดน CORS
+  //   จึงต้องแนบ ACAO(origin)+ACAC(true) ให้ JS อ่าน body ได้ — ส่วนวิดีโอเล่นแบบ no-cors จะเมินค่าพวกนี้ (ไม่กระทบ)
+  const cors = corsHeaders(req, env);
+
   // HEAD: ส่งเฉพาะ metadata
   if (req.method === 'HEAD') {
     const head = await env.MOVIES_BUCKET.head(key);
-    if (!head) return new Response('not found', { status: 404 });
-    const headers = new Headers();
+    if (!head) return new Response('not found', { status: 404, headers: cors });
+    const headers = new Headers(cors);
     head.writeHttpMetadata(headers);
     headers.set('Content-Type', head.httpMetadata?.contentType ?? 'video/mp4');
     headers.set('Content-Length', String(head.size));
@@ -207,7 +212,7 @@ async function handleFile(req: Request, url: URL, env: Env, cookieName: string):
     if (parsed === 'invalid') {
       // ต้องรู้ขนาดไฟล์เพื่อตอบ Content-Range: bytes */<total> ตาม RFC 7233 §4.4
       const head = await env.MOVIES_BUCKET.head(key);
-      const h416 = new Headers();
+      const h416 = new Headers(cors);
       if (head) h416.set('Content-Range', `bytes */${head.size}`);
       return new Response('range not satisfiable', { status: 416, headers: h416 });
     }
@@ -220,13 +225,13 @@ async function handleFile(req: Request, url: URL, env: Env, cookieName: string):
   if (!r2Range) {
     // ไม่มี Range -> รองรับ conditional get (อาจได้ 304) ผ่าน onlyIf
     const object = await env.MOVIES_BUCKET.get(key, { onlyIf: req.headers });
-    if (!object) return new Response('not found', { status: 404 });
+    if (!object) return new Response('not found', { status: 404, headers: cors });
 
     const total = object.size;
 
     // ถ้า conditional request ตรงเงื่อนไข R2 จะคืน object ที่ไม่มี body -> 304
     if (!('body' in object)) {
-      const h304 = new Headers();
+      const h304 = new Headers(cors);
       object.writeHttpMetadata(h304);
       if (object.httpEtag) h304.set('ETag', object.httpEtag);
       // RFC 7232 §4.1 — 304 ควรพก header ที่ปกติส่งใน 200 ที่ยังเกี่ยวข้อง
@@ -235,7 +240,7 @@ async function handleFile(req: Request, url: URL, env: Env, cookieName: string):
       return new Response(null, { status: 304, headers: h304 });
     }
 
-    const headers = new Headers();
+    const headers = new Headers(cors);
     object.writeHttpMetadata(headers);
     headers.set('Content-Type', object.httpMetadata?.contentType ?? 'video/mp4');
     headers.set('Accept-Ranges', 'bytes');
@@ -247,11 +252,11 @@ async function handleFile(req: Request, url: URL, env: Env, cookieName: string):
 
   // มี Range -> get เฉพาะช่วง (ไม่ส่ง onlyIf เพื่อให้ได้ 206 เสมอเมื่อ validator ตรง)
   const object = await env.MOVIES_BUCKET.get(key, { range: r2Range });
-  if (!object) return new Response('not found', { status: 404 });
+  if (!object) return new Response('not found', { status: 404, headers: cors });
 
   const total = object.size; // ขนาดไฟล์เต็ม
 
-  const headers = new Headers();
+  const headers = new Headers(cors);
   object.writeHttpMetadata(headers);
   headers.set('Content-Type', object.httpMetadata?.contentType ?? 'video/mp4');
   headers.set('Accept-Ranges', 'bytes');
@@ -263,7 +268,7 @@ async function handleFile(req: Request, url: URL, env: Env, cookieName: string):
   const resolved = resolveRange(r2Range, total);
   if (resolved === 'unsatisfiable') {
     // offset เกินขนาดไฟล์ -> 416 พร้อม Content-Range: bytes */<total> (RFC 7233 §4.4)
-    const h416 = new Headers();
+    const h416 = new Headers(cors);
     h416.set('Content-Range', `bytes */${total}`);
     h416.set('Accept-Ranges', 'bytes');
     return new Response('range not satisfiable', { status: 416, headers: h416 });

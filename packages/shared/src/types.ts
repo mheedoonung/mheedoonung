@@ -22,6 +22,7 @@ export type MovieStatus = 'draft' | 'published';
 // ข้อมูลไฟล์วิดีโอบน R2 (แยก object — ไม่ส่งออก API ทั้งก้อนเพื่อความปลอดภัย)
 export interface MovieVideo {
   r2Key: string;          // object key ของไฟล์ MP4 บน R2 เช่น "movies/<slug>.mp4"
+  subtitleR2Key?: string; // object key ของไฟล์ซับ .srt บน R2 (แยกไฟล์ เช่น "movies/<slug>.srt") — soft sub ที่ฝังใน MP4 เบราว์เซอร์ไม่อ่านให้
   durationSec: number;    // ความยาว (วินาที)
   sizeBytes?: number;     // ขนาดไฟล์ (ไบต์)
   width?: number;         // ความกว้างวิดีโอ (px)
@@ -96,6 +97,7 @@ export interface PlaybackTokens {
   streamId: string;          // id ของ stream ปัจจุบัน (ใช้ refresh/stop + กันแชร์บัญชี concurrency=1)
   authUrl: string;           // endpoint ของ worker สำหรับ set cookie (เรียกด้วย fetch credentials:'include')
   fileUrl: string;           // URL ไฟล์วิดีโอบน worker (ใส่ใน <video src>)
+  subtitleUrl?: string;      // URL ไฟล์ซับบน worker (มีเฉพาะหนังที่มีซับ) — frontend fetch ด้วย cookie แล้วทำเป็น blob ส่งให้ player
   ttlSeconds: number;        // อายุ grant (วินาที)
   refreshInSeconds: number;  // ควรเรียก /playback/refresh ก่อนถึงเวลานี้ (≈ ttl/2)
 }

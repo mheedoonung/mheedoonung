@@ -54,7 +54,13 @@ export const playbackRoutes = new Elysia()
         },
       });
 
-      return buildPlaybackTokens({ userId, streamId, r2Key, ip: clientIp }) satisfies PlaybackStartResponse;
+      return buildPlaybackTokens({
+        userId,
+        streamId,
+        r2Key,
+        subtitleR2Key: movie.video?.subtitleR2Key,
+        ip: clientIp,
+      }) satisfies PlaybackStartResponse;
     },
     { body: t.Object({ slug: t.String() }) },
   )
@@ -118,6 +124,7 @@ export const playbackRoutes = new Elysia()
         userId,
         streamId: cs.streamId,
         r2Key,
+        subtitleR2Key: movie?.video?.subtitleR2Key,
         ip: clientIp,
       }) satisfies PlaybackRefreshResponse;
     },

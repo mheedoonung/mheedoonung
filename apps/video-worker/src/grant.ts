@@ -7,7 +7,8 @@ export interface GrantPayload {
   v: number; // เวอร์ชัน
   sub: string; // user id
   sid: string; // stream id
-  key: string; // r2 object key ที่อนุญาต
+  key: string; // r2 object key ที่อนุญาต (ไฟล์วิดีโอ)
+  subkey?: string; // r2 object key ของไฟล์ซับ (ถ้ามี) — อนุญาตให้ดึงด้วย grant เดียวกัน
   ip: string; // IP ที่ผูกไว้
   exp: number; // หมดอายุ (ms epoch)
 }
