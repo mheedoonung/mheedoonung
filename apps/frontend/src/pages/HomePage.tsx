@@ -3,9 +3,24 @@
 // - ดึง /movies (MovieListResponse) มาแสดงเป็น grid โปสเตอร์ (player เป็นเฟสถัดไป)
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { PublicMovie, MovieListResponse } from '@mheedoonung/shared';
+import type {
+  PublicMovie,
+  MovieListResponse,
+  MovieSort,
+  GenreListResponse,
+} from '@mheedoonung/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+
+// จำนวนหนังต่อหน้า (ต้องไม่เกิน 60 ตามที่ API clamp ไว้)
+const PAGE_SIZE = 24;
+
+// ตัวเลือกการเรียงลำดับ (ต้องตรงกับ MovieSort ที่ API รองรับ)
+const SORT_OPTIONS: { value: MovieSort; label: string }[] = [
+  { value: 'newest', label: 'ใหม่ล่าสุด' },
+  { value: 'popular', label: 'ยอดนิยม' },
+  { value: 'title', label: 'ชื่อ (ก-ฮ)' },
+];
 
 // แปลง ISO date -> ข้อความวันที่ภาษาไทยอ่านง่าย
 function formatExpiry(iso: string | null): string {
@@ -15,20 +30,82 @@ function formatExpiry(iso: string | null): string {
   return d.toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' });
 }
 
+// สร้างรายการเลขหน้าสำหรับ pager — ย่อด้วย '…' เมื่อหน้าเยอะ (โชว์หน้าแรก/สุดท้าย + เพื่อนบ้านของหน้าปัจจุบัน)
+function buildPageList(current: number, totalPages: number): (number | 'gap')[] {
+  const pages: (number | 'gap')[] = [];
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || (p >= current - 1 && p <= current + 1)) {
+      pages.push(p);
+    } else if (pages[pages.length - 1] !== 'gap') {
+      pages.push('gap');
+    }
+  }
+  return pages;
+}
+
 export function HomePage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [movies, setMovies] = useState<PublicMovie[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loadingMovies, setLoadingMovies] = useState(true);
   const [moviesError, setMoviesError] = useState<string | null>(null);
 
-  // ดึงรายการหนังตอน mount
+  // ตัวกรอง: คำค้น (q = ค่าที่พิมพ์, qApplied = ค่าหลัง debounce ที่ใช้ยิง API), genre, sort
+  const [q, setQ] = useState('');
+  const [qApplied, setQApplied] = useState('');
+  const [genre, setGenre] = useState('');
+  const [sort, setSort] = useState<MovieSort>('newest');
+  const [genres, setGenres] = useState<string[]>([]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasFilter = qApplied !== '' || genre !== '' || sort !== 'newest';
+
+  // โหลดรายชื่อ genre สำหรับ dropdown (ครั้งเดียวตอน mount; เงียบถ้าพลาด — แค่ dropdown ว่าง)
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const res = await api.get<MovieListResponse>('/movies');
-        if (active) setMovies(res.items);
+        const res = await api.get<GenreListResponse>('/movies/genres');
+        if (active) setGenres(res.genres);
+      } catch {
+        /* ไม่เป็นไร — ปล่อย dropdown ว่าง */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // debounce คำค้น 400ms -> qApplied + กลับไปหน้า 1 (กันยิง API ทุกตัวอักษร)
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setQApplied(q.trim());
+      setPage(1);
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [q]);
+
+  // ดึงรายการหนังเมื่อเปลี่ยนหน้า/ตัวกรอง
+  useEffect(() => {
+    let active = true;
+    setLoadingMovies(true);
+    setMoviesError(null);
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      sort,
+    });
+    if (genre) params.set('genre', genre);
+    if (qApplied) params.set('q', qApplied);
+    (async () => {
+      try {
+        const res = await api.get<MovieListResponse>(`/movies?${params.toString()}`);
+        if (active) {
+          setMovies(res.items);
+          setTotal(res.total);
+        }
       } catch {
         if (active) setMoviesError('ไม่สามารถโหลดรายการหนังได้');
       } finally {
@@ -38,7 +115,33 @@ export function HomePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [page, qApplied, genre, sort]);
+
+  // เปลี่ยน genre/sort แล้ว reset กลับหน้า 1 เสมอ
+  const onGenreChange = (value: string): void => {
+    setGenre(value);
+    setPage(1);
+  };
+  const onSortChange = (value: MovieSort): void => {
+    setSort(value);
+    setPage(1);
+  };
+  // ล้างตัวกรองทั้งหมดกลับค่าเริ่มต้น
+  const clearFilters = (): void => {
+    setQ('');
+    setQApplied('');
+    setGenre('');
+    setSort('newest');
+    setPage(1);
+  };
+
+  // เปลี่ยนหน้า + เลื่อนขึ้นบนสุด (clamp กันค่าหลุดช่วง)
+  const goToPage = (p: number): void => {
+    const next = Math.min(Math.max(1, p), totalPages);
+    if (next === page) return;
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // ออกจากระบบแล้วกลับไปหน้า login
   const handleLogout = async (): Promise<void> => {
@@ -62,14 +165,65 @@ export function HomePage() {
       </header>
 
       <main style={styles.main}>
-        <h1 style={styles.ready}>พร้อมดูหนัง</h1>
-        <p style={styles.note}>เลือกเรื่องที่ต้องการรับชม (ระบบเล่นวิดีโอจะเปิดในเฟสถัดไป)</p>
+        <h1 style={styles.ready}>หมีดูหนัง</h1>
+        <p style={styles.note}>เราจะนั่งดูหนังหมีไปด้วยกันนน ❤️</p>
 
         <section>
-          <h2 style={styles.sectionTitle}>รายการหนัง</h2>
+          <div style={styles.sectionHead}>
+            <h2 style={styles.sectionTitle}>รายการหนัง</h2>
+            {total > 0 && (
+              <span style={styles.resultCount}>
+                ทั้งหมด {total} เรื่อง · หน้า {page}/{totalPages}
+              </span>
+            )}
+          </div>
+          {/* toolbar: ค้นหา + กรอง genre + เรียงลำดับ */}
+          <div style={styles.toolbar}>
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="ค้นหาชื่อหนัง..."
+              style={styles.search}
+              aria-label="ค้นหาหนัง"
+            />
+            <select
+              value={genre}
+              onChange={(e) => onGenreChange(e.target.value)}
+              style={styles.select}
+              aria-label="กรองตามหมวดหมู่"
+            >
+              <option value="">ทุกหมวดหมู่</option>
+              {genres.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+            <select
+              value={sort}
+              onChange={(e) => onSortChange(e.target.value as MovieSort)}
+              style={styles.select}
+              aria-label="เรียงลำดับ"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {hasFilter && (
+              <button type="button" onClick={clearFilters} style={styles.clearBtn}>
+                ล้างตัวกรอง
+              </button>
+            )}
+          </div>
+
           {loadingMovies && <p>กำลังโหลดรายการหนัง...</p>}
           {moviesError && <p style={styles.error}>{moviesError}</p>}
-          {!loadingMovies && !moviesError && movies.length === 0 && <p>ยังไม่มีหนังในระบบ</p>}
+          {!loadingMovies && !moviesError && movies.length === 0 && (
+            <p>{hasFilter ? 'ไม่พบหนังที่ตรงกับเงื่อนไข' : 'ยังไม่มีหนังในระบบ'}</p>
+          )}
           <div style={styles.grid}>
             {movies.map((m) => (
               <Link key={m.id} to={`/movie/${encodeURIComponent(m.slug)}`} style={styles.card}>
@@ -84,6 +238,46 @@ export function HomePage() {
               </Link>
             ))}
           </div>
+
+          {/* pager — โชว์เมื่อมีมากกว่า 1 หน้า; ปิดปุ่มเมื่ออยู่หน้าแรก/สุดท้าย หรือกำลังโหลด */}
+          {totalPages > 1 && (
+            <nav style={styles.pager} aria-label="แบ่งหน้า">
+              <button
+                type="button"
+                style={styles.pageBtn}
+                onClick={() => goToPage(page - 1)}
+                disabled={page <= 1 || loadingMovies}
+              >
+                ‹ ก่อนหน้า
+              </button>
+              {buildPageList(page, totalPages).map((p, i) =>
+                p === 'gap' ? (
+                  <span key={`gap-${i}`} style={styles.pageGap}>
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    style={p === page ? styles.pageBtnActive : styles.pageBtn}
+                    onClick={() => goToPage(p)}
+                    disabled={loadingMovies}
+                    aria-current={p === page ? 'page' : undefined}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+              <button
+                type="button"
+                style={styles.pageBtn}
+                onClick={() => goToPage(page + 1)}
+                disabled={page >= totalPages || loadingMovies}
+              >
+                ถัดไป ›
+              </button>
+            </nav>
+          )}
         </section>
       </main>
     </div>
@@ -115,7 +309,48 @@ const styles = {
   main: { maxWidth: 1080, margin: '0 auto', padding: 24 },
   ready: { fontSize: 28, margin: '0 0 4px' },
   note: { color: '#666', marginTop: 0 },
-  sectionTitle: { fontSize: 18, marginTop: 24 },
+  sectionHead: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap' as const,
+    gap: 8,
+    marginTop: 24,
+  },
+  sectionTitle: { fontSize: 18, margin: 0 },
+  resultCount: { color: '#888', fontSize: 13 },
+  toolbar: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 8,
+    margin: '12px 0 16px',
+  },
+  search: {
+    flex: '1 1 220px',
+    minWidth: 160,
+    padding: '8px 12px',
+    border: '1px solid #ddd',
+    borderRadius: 8,
+    fontSize: 14,
+    background: '#fff',
+  },
+  select: {
+    padding: '8px 12px',
+    border: '1px solid #ddd',
+    borderRadius: 8,
+    fontSize: 14,
+    background: '#fff',
+    cursor: 'pointer',
+  },
+  clearBtn: {
+    padding: '8px 12px',
+    border: '1px solid #ddd',
+    borderRadius: 8,
+    fontSize: 14,
+    background: '#f3f3f3',
+    color: '#555',
+    cursor: 'pointer',
+  },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
@@ -137,4 +372,34 @@ const styles = {
   meta: { color: '#888', fontSize: 12 },
   genres: { color: '#aaa', fontSize: 12 },
   error: { color: '#d33' },
+  pager: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap' as const,
+    gap: 6,
+    marginTop: 24,
+  },
+  pageBtn: {
+    minWidth: 38,
+    padding: '6px 10px',
+    background: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: 6,
+    color: '#333',
+    fontSize: 14,
+    cursor: 'pointer',
+  },
+  pageBtnActive: {
+    minWidth: 38,
+    padding: '6px 10px',
+    background: '#e50914',
+    border: '1px solid #e50914',
+    borderRadius: 6,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: 'default',
+  },
+  pageGap: { padding: '6px 4px', color: '#aaa', fontSize: 14 },
 } as const;
