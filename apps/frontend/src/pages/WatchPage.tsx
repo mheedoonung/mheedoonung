@@ -26,6 +26,8 @@ export function WatchPage() {
   //   แล้วทำเป็น blob (same-origin) ส่งให้ player เพราะ vidstack อ่าน track ผ่าน fetch ที่ไม่ได้แนบ cookie ให้
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('');
+  // true เมื่อ autoplay แบบมีเสียงถูกบล็อก -> เล่นต่อแบบ mute -> โชว์ปุ่ม "แตะเพื่อเปิดเสียง"
+  const [showUnmute, setShowUnmute] = useState(false);
 
   const playerRef = useRef<MediaPlayerInstance | null>(null);
   const subtitleBlobRef = useRef<string | null>(null);
@@ -104,9 +106,21 @@ export function WatchPage() {
   }
 
   // เริ่มเล่น (ใช้ทั้งตอน mount และปุ่ม "เล่นต่อที่นี่" หลังถูกเตะ)
+  // ผู้ใช้แตะปุ่มเปิดเสียง (= user gesture) -> เลิก mute + เล่นต่อ + ซ่อนปุ่ม
+  function unmute(): void {
+    const p = playerRef.current;
+    if (p) {
+      p.muted = false;
+      if (p.volume === 0) p.volume = 1;
+      void p.play().catch(() => {});
+    }
+    setShowUnmute(false);
+  }
+
   async function startPlayback(): Promise<void> {
     setPhase('loading');
     setMessage('');
+    setShowUnmute(false);
     try {
       const tok = await api.post<PlaybackTokens>('/playback/start', { slug });
       streamIdRef.current = tok.streamId;
@@ -174,6 +188,12 @@ export function WatchPage() {
               if (!p) return;
               p.muted = true;
               void p.play().catch(() => {});
+              setShowUnmute(true); // โชว์ปุ่มให้ผู้ใช้แตะเปิดเสียงเอง
+            }}
+            // ผู้ใช้กดปุ่มลำโพงเองใน control bar -> ถ้ามีเสียงแล้วก็ซ่อนปุ่ม overlay
+            onVolumeChange={() => {
+              const p = playerRef.current;
+              if (p && !p.muted) setShowUnmute(false);
             }}
             onContextMenu={(e) => e.preventDefault()}
             onError={() => setMessage('โหลดวิดีโอมีปัญหา (ตรวจว่า video-worker ทำงานและไฟล์อยู่บน R2)')}
@@ -193,6 +213,13 @@ export function WatchPage() {
             )}
             <DefaultVideoLayout icons={defaultLayoutIcons} />
           </MediaPlayer>
+        )}
+
+        {/* autoplay ถูกบล็อก -> เล่นแบบ mute: ปุ่มให้ผู้ใช้แตะเปิดเสียง (วางบนสุด ไม่ทับ control bar) */}
+        {phase === 'playing' && showUnmute && (
+          <button type="button" style={styles.unmuteBtn} onClick={unmute}>
+            🔊 แตะเพื่อเปิดเสียง
+          </button>
         )}
 
         {phase === 'kicked' && (
@@ -250,4 +277,20 @@ const styles = {
     cursor: 'pointer',
   },
   softError: { color: '#ffb3b3', textAlign: 'center' as const, padding: '8px 16px', fontSize: 13 },
+  unmuteBtn: {
+    position: 'absolute' as const,
+    top: 16,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 10,
+    padding: '10px 18px',
+    background: 'rgba(0,0,0,0.7)',
+    color: '#fff',
+    border: '1px solid rgba(255,255,255,0.4)',
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    backdropFilter: 'blur(4px)',
+  },
 } as const;
