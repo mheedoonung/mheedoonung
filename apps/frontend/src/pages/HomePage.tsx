@@ -22,6 +22,16 @@ const SORT_OPTIONS: { value: MovieSort; label: string }[] = [
   { value: 'title', label: 'ชื่อ (ก-ฮ)' },
 ];
 
+// badge "ฮิต": หนัง viewCount มากสุด 20 เรื่องแรก (ดึงจาก sort=popular)
+const HOT_COUNT = 20;
+
+// badge "ใหม่": ดึงเวลาสร้างจาก 4 ไบต์แรกของ ObjectId (id) — ไม่ต้องเพิ่ม field/แก้ backend
+// ponytail: ObjectId hex 8 ตัวแรก = unix seconds ของตอน insert
+function isNew(id: string): boolean {
+  const sec = parseInt(id.slice(0, 8), 16);
+  return Number.isFinite(sec) && Date.now() - sec * 1000 < 15 * 24 * 60 * 60 * 1000;
+}
+
 // แปลง ISO date -> ข้อความวันที่ภาษาไทยอ่านง่าย
 function formatExpiry(iso: string | null): string {
   if (!iso) return '-';
@@ -58,6 +68,7 @@ export function HomePage() {
   const [genre, setGenre] = useState('');
   const [sort, setSort] = useState<MovieSort>('newest');
   const [genres, setGenres] = useState<string[]>([]);
+  const [hotIds, setHotIds] = useState<Set<string>>(new Set());
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilter = qApplied !== '' || genre !== '' || sort !== 'newest';
@@ -71,6 +82,22 @@ export function HomePage() {
         if (active) setGenres(res.genres);
       } catch {
         /* ไม่เป็นไร — ปล่อย dropdown ว่าง */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // top 20 เรื่องยอดวิวสูงสุด = เซ็ต "ฮิต" (ดึงรอบเดียว, ข้ามเรื่อง 0 วิวเพื่อไม่ติดฮิตทั้งที่ยังไม่มีคนดู)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await api.get<MovieListResponse>(`/movies?sort=popular&limit=${HOT_COUNT}`);
+        if (active) setHotIds(new Set(res.items.filter((m) => m.viewCount > 0).map((m) => m.id)));
+      } catch {
+        /* ไม่เป็นไร — ไม่มี badge ฮิต */
       }
     })();
     return () => {
@@ -227,7 +254,13 @@ export function HomePage() {
           <div style={styles.grid}>
             {movies.map((m) => (
               <Link key={m.id} to={`/movie/${encodeURIComponent(m.slug)}`} style={styles.card}>
-                <img src={m.posterUrl} alt={m.title} style={styles.poster} loading="lazy" />
+                <div style={styles.posterWrap}>
+                  <img src={m.posterUrl} alt={m.title} style={styles.poster} loading="lazy" />
+                  <div style={styles.badges}>
+                    {isNew(m.id) && <span style={styles.badgeNew}>ใหม่</span>}
+                    {hotIds.has(m.id) && <span style={styles.badgeHot}>🔥 ฮิต</span>}
+                  </div>
+                </div>
                 <div style={styles.cardBody}>
                   <span style={styles.movieTitle}>{m.title}</span>
                   <span style={styles.meta}>
@@ -366,7 +399,12 @@ const styles = {
     textDecoration: 'none',
     color: 'inherit',
   },
-  poster: { width: '100%', aspectRatio: '2 / 3', objectFit: 'cover' as const, display: 'block' },
+  posterWrap: { position: 'relative' as const, background: '#111' },
+  // contain = ไม่ครอป (โชว์ภาพเต็ม ชื่อในภาพไม่ขาด) แลกกับมีแถบดำเมื่อสัดส่วนไม่ใช่ 2:3
+  poster: { width: '100%', aspectRatio: '2 / 3', objectFit: 'contain' as const, display: 'block' },
+  badges: { position: 'absolute' as const, top: 8, left: 8, display: 'flex', flexDirection: 'column' as const, gap: 4, alignItems: 'flex-start' },
+  badgeNew: { background: '#2e7d32', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 },
+  badgeHot: { background: '#e50914', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 },
   cardBody: { padding: 10, display: 'flex', flexDirection: 'column' as const, gap: 2 },
   movieTitle: { fontWeight: 600, fontSize: 15 },
   meta: { color: '#888', fontSize: 12 },
