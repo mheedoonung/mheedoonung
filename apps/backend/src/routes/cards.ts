@@ -9,6 +9,7 @@ import type {
   CardStatus,
 } from '@mheedoonung/shared';
 import { sessionPlugin } from '../plugins/session';
+import { rateLimit } from '../lib/rateLimit';
 import {
   createCards,
   redeemCard,
@@ -32,11 +33,16 @@ export const cardRoutes = new Elysia()
   // POST /cards/redeem {code} -> ต้องมี currentUser
   .post(
     '/cards/redeem',
-    async ({ body, currentUser, set }) => {
+    async ({ body, currentUser, clientIp, set }) => {
       // ต้อง login เป็น user ก่อน
       if (!currentUser) {
         set.status = 401;
         return { error: 'unauthorized' } satisfies ApiError;
+      }
+      // กันไล่เดารหัสบัตร — 10 ครั้ง/5 นาที ต่อ IP
+      if (!rateLimit(`redeem:${clientIp}`, 10, 5 * 60_000)) {
+        set.status = 429;
+        return { error: 'too_many_requests', message: 'เติมบัตรบ่อยเกินไป ลองใหม่ภายหลัง' } satisfies ApiError;
       }
       try {
         const { accessExpiresAt, daysAdded } = await redeemCard(body.code, currentUser);

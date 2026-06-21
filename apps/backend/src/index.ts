@@ -2,7 +2,7 @@
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { env } from './config/env';
-import { connectMongo } from './db/mongo';
+import { connectMongo, getDb } from './db/mongo';
 // route เหล่านี้สร้างโดย vertical อื่น — import ตาม path/ชื่อ export ที่ตกลงกันไว้
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
@@ -24,8 +24,16 @@ const app = new Elysia()
       credentials: true,
     }),
   )
-  // health check
-  .get('/health', () => ({ ok: true }))
+  // health check — ping mongo จริงเพื่อให้ uptime monitor จับ DB ล่มได้ (ไม่ใช่แค่ process ยังอยู่)
+  .get('/health', async ({ set }) => {
+    try {
+      await getDb().command({ ping: 1 });
+      return { ok: true };
+    } catch {
+      set.status = 503;
+      return { ok: false } as const;
+    }
+  })
   // route ของแต่ละ vertical
   .use(authRoutes)
   .use(adminRoutes)

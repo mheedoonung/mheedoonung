@@ -47,12 +47,16 @@ export const playbackRoutes = new Elysia()
       const now = new Date().toISOString();
 
       // เขียนทับ currentStream เสมอ (เครื่องใหม่เข้ามาแทนที่เครื่องเก่า)
-      await collections.users.updateOne({ _id: new ObjectId(userId) } as any, {
-        $set: {
-          currentStream: { streamId, movieId, ip: clientIp, startedAt: now, heartbeatAt: now },
-          updatedAt: now,
-        },
-      });
+      // + นับวิว (ใช้ขับ sort=popular และ badge ฮิต) // ponytail: นับต่อ /start; ถ้าเฟ้อค่อย debounce ต่อ stream/วัน
+      await Promise.all([
+        collections.users.updateOne({ _id: new ObjectId(userId) } as any, {
+          $set: {
+            currentStream: { streamId, movieId, ip: clientIp, startedAt: now, heartbeatAt: now },
+            updatedAt: now,
+          },
+        }),
+        collections.movies.updateOne({ _id: movie._id } as any, { $inc: { viewCount: 1 } }),
+      ]);
 
       return buildPlaybackTokens({
         userId,
@@ -140,12 +144,11 @@ export const playbackRoutes = new Elysia()
         return { error: 'unauthorized' } satisfies ApiError;
       }
       const userId = currentUser._id!;
-      const fresh = await collections.users.findOne({ _id: new ObjectId(userId) } as any);
-      if (fresh?.currentStream?.streamId === body.streamId) {
-        await collections.users.updateOne({ _id: new ObjectId(userId) } as any, {
-          $set: { currentStream: null, updatedAt: new Date().toISOString() },
-        });
-      }
+      // atomic: เคลียร์เฉพาะเมื่อ currentStream ยังเป็น stream นี้ (กัน stop เก่าลบ stream ใหม่ที่เพิ่ง /start)
+      await collections.users.updateOne(
+        { _id: new ObjectId(userId), 'currentStream.streamId': body.streamId } as any,
+        { $set: { currentStream: null, updatedAt: new Date().toISOString() } },
+      );
       return { ok: true };
     },
     { body: t.Object({ streamId: t.String() }) },

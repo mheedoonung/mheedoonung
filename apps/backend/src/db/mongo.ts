@@ -61,6 +61,7 @@ export async function ensureIndexes(): Promise<void> {
     collections.movies.createIndex({ status: 1, createdAt: -1 }),
     collections.movies.createIndex({ status: 1, featured: 1 }),
     collections.movies.createIndex({ status: 1, viewCount: -1 }),
+    collections.movies.createIndex({ status: 1, title: 1 }), // รองรับ sort=title ไม่ให้ทำ in-memory SORT
     collections.movies.createIndex({ genres: 1 }),
   ]);
 }

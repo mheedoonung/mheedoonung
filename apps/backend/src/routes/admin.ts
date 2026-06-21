@@ -6,6 +6,7 @@ import type { ApiError } from '@mheedoonung/shared';
 import { collections } from '../db/mongo';
 import { verifyPassword } from '../lib/crypto';
 import { sessionPlugin } from '../plugins/session';
+import { rateLimit } from '../lib/rateLimit';
 
 // route ของ admin — prefix '/admin', ใช้ sessionPlugin เพื่ออ่าน/เขียน admin session
 export const adminRoutes = new Elysia({ prefix: '/admin' })
@@ -14,7 +15,12 @@ export const adminRoutes = new Elysia({ prefix: '/admin' })
   // POST /admin/login — หา admin จาก username -> verify รหัสผ่าน -> ตั้ง admin session
   .post(
     '/login',
-    async ({ body, setAdminSession, set }) => {
+    async ({ body, clientIp, setAdminSession, set }) => {
+      // กัน brute-force รหัสผ่าน admin (admin ออกบัตรเงินจริงได้) — 10 ครั้ง/5 นาที ต่อ IP
+      if (!rateLimit(`admin-login:${clientIp}`, 10, 5 * 60_000)) {
+        set.status = 429;
+        return { error: 'too_many_requests', message: 'พยายามเข้าสู่ระบบบ่อยเกินไป ลองใหม่ภายหลัง' } satisfies ApiError;
+      }
       // หา admin จาก username (มี unique index อยู่แล้ว)
       const admin = await collections.admins.findOne({ username: body.username });
 
