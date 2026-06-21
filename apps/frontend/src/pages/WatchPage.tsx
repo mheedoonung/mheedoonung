@@ -124,8 +124,17 @@ export function WatchPage() {
     try {
       const tok = await api.post<PlaybackTokens>('/playback/start', { slug });
       streamIdRef.current = tok.streamId;
+      // ออกจากหน้าระหว่าง /start in-flight: cleanup รันไปแล้วตอน streamId ยัง null
+      //   -> stream ที่เพิ่งสร้างจะค้าง (เครื่องอื่นโดน 409) ต้องสั่ง stop เองตรงนี้
+      if (!aliveRef.current) {
+        void api.post('/playback/stop', { streamId: tok.streamId }).catch(() => {});
+        return;
+      }
       await primeCookie(tok.authUrl);
-      if (!aliveRef.current) return;
+      if (!aliveRef.current) {
+        void api.post('/playback/stop', { streamId: tok.streamId }).catch(() => {});
+        return;
+      }
       setFileUrl(tok.fileUrl);
       setPhase('playing');
       // โหลดซับ (ถ้ามี) — cookie ถูกตั้งจาก primeCookie แล้ว ใช้ grant เดียวกันดึงได้
