@@ -64,6 +64,15 @@ export interface CreateCardsBody { days: number; quantity: number; note?: string
 export interface CreateCardsResponse { created: number; codes: string[] }
 export interface CardListItem { id: string; code: string; days: number; status: CardStatus; note?: string; redeemedByUserId?: string | null; redeemedAt?: string | null; expiresAt?: string | null; createdBy: string; createdAt: string }
 export interface CardListResponse { items: CardListItem[]; total: number; page: number; limit: number }
+// สรุปยอดบัตรตามช่วงเวลา (filter ด้วย createdAt ISO; from/to เป็น ISO string)
+export interface CardSummaryByStatus { status: CardStatus; count: number; days: number }
+export interface CardSummaryResponse {
+  from: string | null;   // ขอบล่างที่ใช้ filter (ISO) หรือ null = ไม่จำกัด
+  to: string | null;     // ขอบบนที่ใช้ filter (ISO) หรือ null = ไม่จำกัด
+  total: number;         // จำนวนบัตรที่ "สร้าง" ในช่วง
+  totalDays: number;     // รวมจำนวนวันของบัตรในช่วง
+  byStatus: CardSummaryByStatus[]; // แยกตามสถานะ (unused/redeemed/revoked)
+}
 // ---- DTO ของหนังที่ส่งออก API (ตัด r2Key / video internals ออก) ----
 export interface PublicMovie {
   id: string;

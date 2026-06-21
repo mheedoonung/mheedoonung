@@ -15,10 +15,12 @@ import {
   redeemCard,
   listCards,
   revokeCard,
+  summarizeCards,
   RedeemError,
   RevokeError,
   type RedeemErrorCode,
 } from '../services/card.service';
+import type { CardSummaryResponse } from '@mheedoonung/shared';
 
 // map RedeemError code -> HTTP status (invalid_code=400, already_used/revoked=409)
 function redeemStatus(code: RedeemErrorCode): number {
@@ -92,6 +94,25 @@ export const cardRoutes = new Elysia()
         days: t.Integer({ minimum: 1 }),
         quantity: t.Integer({ minimum: 1, maximum: 1000 }),
         note: t.Optional(t.String()),
+      }),
+    },
+  )
+
+  // ---- ADMIN: สรุปยอดบัตรตามช่วงเวลา ----
+  // GET /admin/cards/summary?from&to (ISO) -> ต้องมี currentAdmin
+  .get(
+    '/admin/cards/summary',
+    async ({ query, currentAdmin, set }) => {
+      if (!currentAdmin) {
+        set.status = 401;
+        return { error: 'unauthorized' } satisfies ApiError;
+      }
+      return (await summarizeCards({ from: query.from, to: query.to })) satisfies CardSummaryResponse;
+    },
+    {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
       }),
     },
   )

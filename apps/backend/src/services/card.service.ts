@@ -7,6 +7,7 @@ import type {
   User,
   CardListItem,
   CardListResponse,
+  CardSummaryResponse,
 } from '@mheedoonung/shared';
 import { collections } from '../db/mongo';
 import { generateCardCode, normalizeCardCode } from '../lib/crypto';
@@ -274,6 +275,40 @@ export async function listCards(query: {
     total,
     page,
     limit,
+  };
+}
+
+// สรุปยอดบัตรตามช่วงเวลา (อิง createdAt ที่เป็น ISO string -> เทียบ string ได้ตรง ๆ)
+//   นับ "บัตรที่สร้าง" ในช่วง แยกตามสถานะ + รวมจำนวนวัน
+export async function summarizeCards(query: {
+  from?: string;
+  to?: string;
+}): Promise<CardSummaryResponse> {
+  const range: Record<string, string> = {};
+  if (query.from) range.$gte = query.from;
+  if (query.to) range.$lte = query.to;
+  const match = Object.keys(range).length ? { createdAt: range } : {};
+
+  const rows = await collections.cards
+    .aggregate<{ _id: CardStatus; count: number; days: number }>([
+      { $match: match },
+      { $group: { _id: '$status', count: { $sum: 1 }, days: { $sum: '$days' } } },
+    ])
+    .toArray();
+
+  // เติมให้ครบทุกสถานะ (รวม 0) เพื่อ UI แสดงคงที่
+  const STATUSES: CardStatus[] = ['unused', 'redeemed', 'revoked'];
+  const byStatus = STATUSES.map((status) => {
+    const r = rows.find((x) => x._id === status);
+    return { status, count: r?.count ?? 0, days: r?.days ?? 0 };
+  });
+
+  return {
+    from: query.from ?? null,
+    to: query.to ?? null,
+    total: byStatus.reduce((n, s) => n + s.count, 0),
+    totalDays: byStatus.reduce((n, s) => n + s.days, 0),
+    byStatus,
   };
 }
 

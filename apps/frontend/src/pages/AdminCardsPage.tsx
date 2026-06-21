@@ -8,6 +8,7 @@ import type {
   CardListItem,
   CardListResponse,
   CardStatus,
+  CardSummaryResponse,
   CreateCardsBody,
   CreateCardsResponse,
 } from '@mheedoonung/shared';
@@ -15,6 +16,20 @@ import { api, ApiClientError } from '../api/client';
 
 // จำนวนต่อหน้าในตาราง
 const PAGE_LIMIT = 50;
+
+// แปลง Date -> 'YYYY-MM-DD' ตามเวลาเครื่อง (สำหรับ <input type="date">)
+function toYmd(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+// แปลงวัน (local) -> ขอบ ISO ส่งให้ API; ใช้เวลาเครื่อง admin (ไทย) แล้ว toISOString เป็น UTC ให้ตรงกับ createdAt
+function dayStartIso(ymd: string): string {
+  return new Date(`${ymd}T00:00:00`).toISOString();
+}
+function dayEndIso(ymd: string): string {
+  return new Date(`${ymd}T23:59:59.999`).toISOString();
+}
 
 // ตัวเลือกตัวกรองสถานะ ('' = ทั้งหมด)
 type StatusFilter = '' | CardStatus;
@@ -46,6 +61,13 @@ export function AdminCardsPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createdCodes, setCreatedCodes] = useState<string[]>([]);
+
+  // ---- state ของสรุปยอด (ตามช่วงวันที่) — ตั้งต้นเป็นเดือนปัจจุบัน (วันที่ 1 ถึงวันนี้) ----
+  const [fromDate, setFromDate] = useState(() => toYmd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [toDate, setToDate] = useState(() => toYmd(new Date()));
+  const [summary, setSummary] = useState<CardSummaryResponse | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   // ---- state ของตารางบัตร ----
   const [items, setItems] = useState<CardListItem[]>([]);
@@ -103,6 +125,29 @@ export function AdminCardsPage() {
       void loadCards();
     }
   }, [authState, loadCards]);
+
+  // โหลดสรุปยอด (ตามช่วงวันที่) — ส่ง from/to เป็นขอบ ISO ของวัน (เวลาเครื่อง admin)
+  const loadSummary = useCallback(async (): Promise<void> => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const params = new URLSearchParams();
+      if (fromDate) params.set('from', dayStartIso(fromDate));
+      if (toDate) params.set('to', dayEndIso(toDate));
+      const res = await api.get<CardSummaryResponse>(`/admin/cards/summary?${params.toString()}`);
+      setSummary(res);
+    } catch {
+      setSummaryError('ไม่สามารถโหลดสรุปยอดได้');
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [fromDate, toDate]);
+
+  useEffect(() => {
+    if (authState === 'authorized') {
+      void loadSummary();
+    }
+  }, [authState, loadSummary]);
 
   // สร้างบัตรใหม่
   const handleCreate = async (e: FormEvent): Promise<void> => {
@@ -238,6 +283,54 @@ export function AdminCardsPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+        </section>
+
+        {/* สรุปยอดบัตรตามช่วงวันที่ */}
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>สรุปยอดบัตร (ตามวันที่สร้าง)</h2>
+          <div style={styles.form}>
+            <label style={styles.label}>
+              จากวันที่
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.label}>
+              ถึงวันที่
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                style={styles.input}
+              />
+            </label>
+          </div>
+
+          {summaryError && <p style={styles.error}>{summaryError}</p>}
+          {summaryLoading && <p>กำลังโหลดสรุป...</p>}
+          {summary && !summaryLoading && (
+            <div style={styles.statGrid}>
+              <div style={styles.statBox}>
+                <span style={styles.statValue}>{summary.total}</span>
+                <span style={styles.statLabel}>บัตรที่สร้าง</span>
+              </div>
+              <div style={styles.statBox}>
+                <span style={styles.statValue}>{summary.totalDays}</span>
+                <span style={styles.statLabel}>รวมจำนวนวัน</span>
+              </div>
+              {summary.byStatus.map((s) => (
+                <div key={s.status} style={styles.statBox}>
+                  <span style={styles.statValue}>{s.count}</span>
+                  <span style={styles.statLabel}>{statusLabel(s.status)}</span>
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -414,4 +507,22 @@ const styles = {
     cursor: 'pointer',
   },
   error: { color: '#d33', marginTop: 12 },
+  statGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+    gap: 12,
+    marginTop: 16,
+  },
+  statBox: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 4,
+    padding: '14px 10px',
+    background: '#f8fafc',
+    border: '1px solid #eee',
+    borderRadius: 10,
+  },
+  statValue: { fontSize: 24, fontWeight: 700, color: '#111' },
+  statLabel: { fontSize: 13, color: '#666' },
 } as const;
