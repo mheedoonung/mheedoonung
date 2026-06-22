@@ -32,6 +32,10 @@ button:disabled {
   max-height: 100%;
   aspect-ratio: auto !important;
   background: #000;
+  /* ซับใหญ่เกิน: default ของ Vidstack คิด font จาก 4.5% ของ overlay-height ซึ่งเป็นด้าน "ยาว"
+     ของวิดีโอแนวตั้ง (9:16) → ตัวอักษรใหญ่เกิน. แก้: อิงด้าน "สั้น" เสมอ (min) ทุก orientation.
+     ปรับเลข 3.8 ขึ้น/ลงได้; --media-user-font-size (เมนูผู้ใช้) ยังคูณทับปรับเองได้ */
+  --media-cue-font-size: calc(min(var(--overlay-width), var(--overlay-height)) / 100 * 3.8);
 }
 .mdn-player video {
   width: 100%;

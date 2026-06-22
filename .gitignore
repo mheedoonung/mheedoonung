@@ -23,3 +23,5 @@ build
 # macOS
 .DS_Store
 .playwright-mcp/*
+# local secret (mongo tunnel script มี db password)
+scripts/mongo-tunnel.sh
