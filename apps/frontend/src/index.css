@@ -36,7 +36,7 @@ button:disabled {
      ** --overlay-width ไม่ถูกนิยาม → min(undefined,..) invalid → override พัง ใช้ default ใหญ่ **
      แก้: ใช้ vw (นิยามเสมอ ไม่พึ่ง overlay var) — บนจอแนวตั้ง vw = ด้านสั้น → ขนาดพอดี.
      clamp กันเล็ก/ใหญ่เกินบน desktop. ปรับ 4.2vw ขึ้น/ลงได้ */
-  --media-cue-font-size: clamp(15px, 6vw, 26px);
+  --media-cue-font-size: clamp(15px, 5.4vw, 26px);
 }
 
 .mdn-player video {
