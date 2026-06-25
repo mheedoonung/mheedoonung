@@ -44,3 +44,24 @@ button:disabled {
   height: 100%;
   object-fit: contain;
 }
+
+/* faux-fullscreen (iPhone) — fullscreen เองด้วย CSS แทน native video FS
+   เก็บ player ไว้ใน DOM → ซับ (overlay) ยังโชว์ + ไม่บังคับแนวนอน (หนังแนวตั้งเต็มจอตามจริง)
+   หมายเหตุ: บน Safari แท็บปกติ ยังเห็นแถบ address/tool ของ Safari (เลี่ยงไม่ได้) — แค่เต็ม viewport */
+.mdn-player.mdn-faux-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+}
+
+/* ยกซับให้สูงจากขอบล่าง — default ของ Vidstack ดันซับลงชิดล่าง (bottom:0) ตอน control ซ่อน อ่านยาก
+   override ให้คงที่ทั้งตอนโชว์/ซ่อน control (ไม่กระโดด) แยกค่าตามจอ (control คนละความสูง) */
+.mdn-player .vds-captions {
+  bottom: 90px;
+}
+.mdn-player .vds-video-layout[data-sm] .vds-captions {
+  bottom: 64px;
+}

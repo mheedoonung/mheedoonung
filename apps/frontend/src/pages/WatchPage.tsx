@@ -16,6 +16,10 @@ import { api, ApiClientError } from '../api/client';
 
 type Phase = 'loading' | 'playing' | 'kicked' | 'error';
 
+// ไอคอน fullscreen ของ Vidstack — reuse กับปุ่ม faux-fullscreen เอง (iPhone)
+const FsEnterIcon = defaultLayoutIcons.FullscreenButton.Enter;
+const FsExitIcon = defaultLayoutIcons.FullscreenButton.Exit;
+
 export function WatchPage() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
@@ -28,6 +32,19 @@ export function WatchPage() {
   const [message, setMessage] = useState<string>('');
   // true เมื่อ autoplay แบบมีเสียงถูกบล็อก -> เล่นต่อแบบ mute -> โชว์ปุ่ม "แตะเพื่อเปิดเสียง"
   const [showUnmute, setShowUnmute] = useState(false);
+  // iPhone Safari ไม่มี Fullscreen API จริง -> Vidstack ตกไปใช้ native <video> fullscreen ซึ่ง
+  //   (1) ไม่ render ซับแบบ overlay ของ Vidstack (2) บังคับแนวนอน -> หนังแนวตั้งเล็กลง.
+  //   ตรวจว่าไม่มี FS API แล้วทำ fullscreen เองด้วย CSS (เก็บ player ใน DOM) เพื่อแก้ทั้งสองข้อ.
+  //   iPad/desktop/Android มี FS API -> ปล่อยใช้ของเดิม (ซับ+orientation ทำงานปกติ)
+  const [noFsApi] = useState(
+    () =>
+      typeof document !== 'undefined' &&
+      !(
+        document.fullscreenEnabled ||
+        (document as unknown as { webkitFullscreenEnabled?: boolean }).webkitFullscreenEnabled
+      ),
+  );
+  const [fauxFs, setFauxFs] = useState(false);
 
   const playerRef = useRef<MediaPlayerInstance | null>(null);
   const subtitleBlobRef = useRef<string | null>(null);
@@ -186,7 +203,7 @@ export function WatchPage() {
           //   หมายเหตุ: เป็น cosmetic เท่านั้น — กัน rip จริงไม่ได้ (ดูดผ่าน devtools/yt-dlp ได้) ต้อง DRM ถึงจะกันจริง
           <MediaPlayer
             ref={playerRef}
-            className="mdn-player"
+            className={`mdn-player${fauxFs ? ' mdn-faux-fs' : ''}`}
             src={{ src: fileUrl, type: 'video/mp4' }}
             autoPlay
             playsInline
@@ -220,7 +237,31 @@ export function WatchPage() {
                 default
               />
             )}
-            <DefaultVideoLayout icons={defaultLayoutIcons} />
+            <DefaultVideoLayout
+              icons={defaultLayoutIcons}
+              // iPhone: แทนปุ่ม fullscreen ของ Vidstack (ที่เรียก native FS) ด้วยปุ่ม faux-FS เอง
+              //   วางในแถบ control เดิม -> ซ่อน/โชว์ตาม control, สไตล์เหมือนปุ่มอื่น
+              slots={
+                noFsApi
+                  ? {
+                      fullscreenButton: (
+                        <button
+                          type="button"
+                          className="vds-button"
+                          aria-label={fauxFs ? 'ออกจากเต็มจอ' : 'เต็มจอ'}
+                          onClick={() => setFauxFs((v) => !v)}
+                        >
+                          {fauxFs ? (
+                            <FsExitIcon className="vds-icon" />
+                          ) : (
+                            <FsEnterIcon className="vds-icon" />
+                          )}
+                        </button>
+                      ),
+                    }
+                  : undefined
+              }
+            />
           </MediaPlayer>
         )}
 
