@@ -187,14 +187,14 @@ export function WatchPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.bar}>
-        <Link to="/" style={styles.back}>
-          ← กลับ
-        </Link>
-        <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.barLogo} />
-      </div>
-
       <div style={styles.stage}>
+        {/* ปุ่มกลับสำหรับตอนที่ player ยังไม่ขึ้น (loading/error/kicked) — ตอนเล่นอยู่ ใช้ปุ่มใน control bar แทน (auto-hide) */}
+        {phase !== 'playing' && (
+          <Link to="/" style={styles.floatBack} aria-label="กลับ">
+            ← กลับ
+          </Link>
+        )}
+
         {phase === 'loading' && <p style={styles.center}>กำลังเตรียมวิดีโอ...</p>}
 
         {phase === 'playing' && fileUrl && (
@@ -241,8 +241,21 @@ export function WatchPage() {
               icons={defaultLayoutIcons}
               // iPhone: แทนปุ่ม fullscreen ของ Vidstack (ที่เรียก native FS) ด้วยปุ่ม faux-FS เอง
               //   วางในแถบ control เดิม -> ซ่อน/โชว์ตาม control, สไตล์เหมือนปุ่มอื่น
-              slots={
-                noFsApi
+              slots={{
+                // ปุ่มกลับใน control bar (มุมบนซ้าย) — auto-hide พร้อม control, ไม่กินพื้นที่วิดีโอ
+                topControlsGroupStart: (
+                  <button
+                    type="button"
+                    className="vds-button"
+                    aria-label="กลับ"
+                    onClick={() => navigate('/')}
+                    style={{ fontSize: 20, lineHeight: 1 }}
+                  >
+                    ←
+                  </button>
+                ),
+                // iPhone: แทนปุ่ม fullscreen ของ Vidstack (native FS) ด้วยปุ่ม faux-FS เอง
+                ...(noFsApi
                   ? {
                       fullscreenButton: (
                         <button
@@ -259,8 +272,8 @@ export function WatchPage() {
                         </button>
                       ),
                     }
-                  : undefined
-              }
+                  : {}),
+              }}
             />
           </MediaPlayer>
         )}
@@ -301,9 +314,19 @@ export function WatchPage() {
 
 const styles = {
   page: { height: '100dvh', minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column' as const },
-  bar: { padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  back: { color: '#fff', textDecoration: 'none', fontSize: 15 },
-  barLogo: { width: 36, height: 36, objectFit: 'contain' as const },
+  floatBack: {
+    position: 'absolute' as const,
+    top: 'max(12px, env(safe-area-inset-top))',
+    left: 'max(12px, env(safe-area-inset-left))',
+    zIndex: 20,
+    color: '#fff',
+    textDecoration: 'none',
+    fontSize: 15,
+    padding: '6px 12px',
+    background: 'rgba(0,0,0,0.5)',
+    borderRadius: 999,
+    backdropFilter: 'blur(4px)',
+  },
   stage: {
     flex: 1,
     minHeight: 0,

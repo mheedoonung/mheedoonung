@@ -20,3 +20,12 @@ createRoot(rootElement).render(
     </AuthProvider>
   </StrictMode>,
 );
+
+// ลงทะเบียน service worker — เปิดเงื่อนไข "ติดตั้งเป็นแอป" บน Android/Chrome
+// (iOS ใช้ Add to Home Screen จาก manifest+apple meta อยู่แล้ว ไม่ต้องพึ่ง SW)
+// ponytail: SW เป็น passthrough เปล่า (ดู public/sw.js) — ไม่ cache เพราะเป็นวิดีโอ+auth
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

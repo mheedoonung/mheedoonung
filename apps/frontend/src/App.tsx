@@ -7,6 +7,7 @@
 //   /admin/cards  : หน้าจัดการบัตร (guard ภายในหน้าผ่าน /admin/me)
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { InstallPrompt } from './components/InstallPrompt';
 import { LoginPage } from './pages/LoginPage';
 import { RedeemPage } from './pages/RedeemPage';
 import { HomePage } from './pages/HomePage';
@@ -18,6 +19,8 @@ import { AdminCardsPage } from './pages/AdminCardsPage';
 export function App() {
   return (
     <BrowserRouter>
+      {/* ปุ่มติดตั้ง PWA — โชว์ลอยทุกหน้า (ซ่อนเองถ้าติดตั้งแล้ว/เบราว์เซอร์ไม่รองรับ) */}
+      <InstallPrompt />
       <Routes>
         {/* หน้าเข้าสู่ระบบผู้ใช้ */}
         <Route path="/login" element={<LoginPage />} />
