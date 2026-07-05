@@ -187,14 +187,16 @@ export function WatchPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.stage}>
-        {/* ปุ่มกลับสำหรับตอนที่ player ยังไม่ขึ้น (loading/error/kicked) — ตอนเล่นอยู่ ใช้ปุ่มใน control bar แทน (auto-hide) */}
-        {phase !== 'playing' && (
-          <Link to="/" style={styles.floatBack} aria-label="กลับ">
-            ← กลับ
-          </Link>
-        )}
+      {/* navbar ลอยทับวิดีโอ (fixed + พื้นหลังโปร่งใส) -> วิดีโอเต็มจอด้านหลัง
+          pointerEvents:none ที่ตัว bar เพื่อให้แตะทะลุไปโดน control ของ player ได้; เปิด auto เฉพาะปุ่ม/โลโก้ */}
+      <div style={styles.bar}>
+        <Link to="/" style={styles.back}>
+          ← กลับ
+        </Link>
+        <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.barLogo} />
+      </div>
 
+      <div style={styles.stage}>
         {phase === 'loading' && <p style={styles.center}>กำลังเตรียมวิดีโอ...</p>}
 
         {phase === 'playing' && fileUrl && (
@@ -241,21 +243,8 @@ export function WatchPage() {
               icons={defaultLayoutIcons}
               // iPhone: แทนปุ่ม fullscreen ของ Vidstack (ที่เรียก native FS) ด้วยปุ่ม faux-FS เอง
               //   วางในแถบ control เดิม -> ซ่อน/โชว์ตาม control, สไตล์เหมือนปุ่มอื่น
-              slots={{
-                // ปุ่มกลับใน control bar (มุมบนซ้าย) — auto-hide พร้อม control, ไม่กินพื้นที่วิดีโอ
-                topControlsGroupStart: (
-                  <button
-                    type="button"
-                    className="vds-button"
-                    aria-label="กลับ"
-                    onClick={() => navigate('/')}
-                    style={{ fontSize: 20, lineHeight: 1 }}
-                  >
-                    ←
-                  </button>
-                ),
-                // iPhone: แทนปุ่ม fullscreen ของ Vidstack (native FS) ด้วยปุ่ม faux-FS เอง
-                ...(noFsApi
+              slots={
+                noFsApi
                   ? {
                       fullscreenButton: (
                         <button
@@ -272,8 +261,8 @@ export function WatchPage() {
                         </button>
                       ),
                     }
-                  : {}),
-              }}
+                  : undefined
+              }
             />
           </MediaPlayer>
         )}
@@ -314,19 +303,24 @@ export function WatchPage() {
 
 const styles = {
   page: { height: '100dvh', minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column' as const },
-  floatBack: {
-    position: 'absolute' as const,
-    top: 'max(12px, env(safe-area-inset-top))',
-    left: 'max(12px, env(safe-area-inset-left))',
+  // navbar ลอย (fixed) พื้นหลังโปร่งใส -> วิดีโอเต็มจอด้านหลัง; pointerEvents:none ให้แตะทะลุไป player ได้
+  bar: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 20,
-    color: '#fff',
-    textDecoration: 'none',
-    fontSize: 15,
-    padding: '6px 12px',
-    background: 'rgba(0,0,0,0.5)',
-    borderRadius: 999,
-    backdropFilter: 'blur(4px)',
+    // ความสูง = safe-area + 8 + (โลโก้ 36) + 8 ≈ safe+52px -> ใช้ค่านี้ดันแถบ control บนของ player (ดู index.css)
+    padding: 'calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    background: 'transparent',
+    pointerEvents: 'none' as const,
   },
+  // back/logo รับ tap เอง (bar เป็น none) + drop shadow ให้อ่านออกบนวิดีโอสว่าง
+  back: { color: '#fff', textDecoration: 'none', fontSize: 15, pointerEvents: 'auto' as const, textShadow: '0 1px 3px rgba(0,0,0,0.8)' },
+  barLogo: { width: 36, height: 36, objectFit: 'contain' as const, pointerEvents: 'auto' as const, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' },
   stage: {
     flex: 1,
     minHeight: 0,

@@ -51,6 +51,9 @@ export function buildLineAuthorizeUrl(state: string): string {
     redirect_uri: env.LINE_LOGIN_REDIRECT_URI,
     state,
     scope: 'profile openid',
+    // โชว์หน้าเพิ่มเพื่อน OA ที่ผูกไว้กับ channel
+    // aggressive = แยกหน้าเพิ่มเพื่อนต่างหากหลัง consent (normal = แค่ติ๊กในหน้า consent)
+    bot_prompt: 'aggressive',
   });
   return `${LINE_AUTHORIZE_URL}?${params.toString()}`;
 }

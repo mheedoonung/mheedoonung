@@ -57,11 +57,18 @@ button:disabled {
   max-height: none;
 }
 
+/* navbar ของแอปลอยทับด้านบน (fixed, โปร่งใส) -> ดันแถบ control แถวบนสุดของ player ลงมาให้พ้น navbar
+   ไม่งั้นปุ่ม cast/cc/settings ของ player ซ้อนกับ "กลับ"/โลโก้. ค่า = ความสูง navbar (ดู WatchPage styles.bar) */
+.mdn-player .vds-controls-group:first-child {
+  margin-top: calc(env(safe-area-inset-top, 0px) + 52px);
+}
+
 /* ยกซับให้สูงจากขอบล่าง — default ของ Vidstack ดันซับลงชิดล่าง (bottom:0) ตอน control ซ่อน อ่านยาก
    override ให้คงที่ทั้งตอนโชว์/ซ่อน control (ไม่กระโดด) แยกค่าตามจอ (control คนละความสูง) */
 .mdn-player .vds-captions {
   bottom: 90px;
 }
+
 .mdn-player .vds-video-layout[data-sm] .vds-captions {
   bottom: 64px;
 }
