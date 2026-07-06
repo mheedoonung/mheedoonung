@@ -5,27 +5,9 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { RedeemBody, RedeemResponse } from '@mheedoonung/shared';
-import { api, ApiClientError } from '../api/client';
+import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-
-// map รหัส error จาก backend -> ข้อความภาษาไทย
-function errorMessage(err: unknown): string {
-  if (err instanceof ApiClientError) {
-    switch (err.payload.error) {
-      case 'invalid_code':
-        return 'ไม่พบรหัสบัตรนี้ กรุณาตรวจสอบอีกครั้ง';
-      case 'already_used':
-        return 'บัตรนี้ถูกใช้ไปแล้ว';
-      case 'revoked':
-        return 'บัตรนี้ถูกยกเลิกการใช้งาน';
-      case 'unauthorized':
-        return 'กรุณาเข้าสู่ระบบก่อนเติมบัตร';
-      default:
-        return err.payload.message ?? 'เติมบัตรไม่สำเร็จ';
-    }
-  }
-  return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
-}
+import { redeemErrorMessage } from '../components/RedeemModal';
 
 export function RedeemPage() {
   const navigate = useNavigate();
@@ -60,7 +42,7 @@ export function RedeemPage() {
       // เด้งกลับหน้าที่ user ตั้งใจจะไป (เช่นหน้าดูหนัง) ถ้าไม่มีก็ไปหน้าหลัก
       navigate(fromPath, { replace: true });
     } catch (e) {
-      setError(errorMessage(e));
+      setError(redeemErrorMessage(e));
     } finally {
       setSubmitting(false);
     }

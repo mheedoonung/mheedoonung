@@ -11,6 +11,7 @@ import type {
 } from '@mheedoonung/shared';
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { RedeemModal } from '../components/RedeemModal';
 
 // จำนวนหนังต่อหน้า (ต้องไม่เกิน 60 ตามที่ API clamp ไว้)
 const PAGE_SIZE = 24;
@@ -69,6 +70,7 @@ export function HomePage() {
   const [sort, setSort] = useState<MovieSort>('newest');
   const [genres, setGenres] = useState<string[]>([]);
   const [hotIds, setHotIds] = useState<Set<string>>(new Set());
+  const [redeemOpen, setRedeemOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilter = qApplied !== '' || genre !== '' || sort !== 'newest';
@@ -186,10 +188,17 @@ export function HomePage() {
             <span style={styles.expiry}> · สิทธิ์ใช้งานถึง {formatExpiry(user?.accessExpiresAt ?? null)}</span>
           </div>
         </div>
-        <button type="button" onClick={handleLogout} style={styles.logoutButton}>
-          ออกจากระบบ
-        </button>
+        <div className="mdn-home-actions">
+          <button type="button" onClick={() => setRedeemOpen(true)} style={styles.topupButton}>
+            + เติมเวลา
+          </button>
+          <button type="button" onClick={handleLogout} style={styles.logoutButton}>
+            ออกจากระบบ
+          </button>
+        </div>
       </header>
+
+      <RedeemModal open={redeemOpen} onClose={() => setRedeemOpen(false)} />
 
       <main style={styles.main}>
         <h1 style={styles.ready}>หมีดูหนัง</h1>
@@ -332,12 +341,30 @@ const styles = {
   brandWrap: { display: 'flex', alignItems: 'center', gap: 10 },
   brand: { width: 40, height: 40, objectFit: 'contain' as const, borderRadius: 8, flexShrink: 0 },
   expiry: { color: '#666', fontSize: 14 },
-  logoutButton: {
-    padding: '6px 12px',
-    background: '#eee',
-    border: '1px solid #ccc',
-    borderRadius: 6,
+  // ปุ่ม CTA หลัก — gradient + เงา ให้เด่น
+  topupButton: {
+    padding: '9px 18px',
+    background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 700,
     cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+    boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
+  },
+  // ออกจากระบบ = destructive -> แดง (outline อ่อน ไม่แย่งเด่นกับ CTA)
+  logoutButton: {
+    padding: '9px 14px',
+    background: '#fef2f2',
+    color: '#dc2626',
+    border: '1px solid #fca5a5',
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   main: { maxWidth: 1080, margin: '0 auto', padding: 24 },
   ready: { fontSize: 28, margin: '0 0 4px' },

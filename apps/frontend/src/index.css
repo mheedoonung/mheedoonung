@@ -24,6 +24,21 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* ปุ่ม header หน้าหลัก (เติมเวลา / ออกจากระบบ)
+   จอเล็ก: กินเต็มแถว แล้วดันสองปุ่มไปคนละฝั่ง (space-between) ไม่ให้ชิดกัน */
+.mdn-home-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+@media (max-width: 520px) {
+  .mdn-home-actions {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+}
+
 /* Vidstack player (หน้าดูหนัง) — ให้เต็มพื้นที่จอ แล้ววิดีโอ fit ตามสัดส่วนจริง
    (override default aspect-ratio 16/9 ของ Vidstack เพื่อรองรับหนังแนวตั้ง/แนวนอน) */
 .mdn-player {
