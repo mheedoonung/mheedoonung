@@ -12,6 +12,10 @@ import type {
 import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { RedeemModal } from '../components/RedeemModal';
+import { ExpiryWarningModal } from '../components/ExpiryWarningModal';
+
+// เกณฑ์ "ใกล้หมด" = เหลือน้อยกว่า 1 วัน
+const DAY_MS = 20 * 60 * 60 * 1000;
 
 // จำนวนหนังต่อหน้า (ต้องไม่เกิน 60 ตามที่ API clamp ไว้)
 const PAGE_SIZE = 24;
@@ -71,6 +75,20 @@ export function HomePage() {
   const [genres, setGenres] = useState<string[]>([]);
   const [hotIds, setHotIds] = useState<Set<string>>(new Set());
   const [redeemOpen, setRedeemOpen] = useState(false);
+  const [expiryWarnOpen, setExpiryWarnOpen] = useState(false);
+
+  // เหลือเวลาใช้งาน < 1 วัน (และยังไม่หมด) -> ใกล้หมด
+  const msLeft = user?.accessExpiresAt ? new Date(user.accessExpiresAt).getTime() - Date.now() : null;
+  const expiringSoon = msLeft !== null && msLeft > 0 && msLeft < DAY_MS;
+
+  // เข้าหน้ามาแล้วใกล้หมด -> เด้ง modal เตือน "ครั้งเดียวต่อวัน" (กัน user รำคาญ) ผ่าน localStorage
+  useEffect(() => {
+    if (!expiringSoon) return;
+    const today = new Date().toLocaleDateString('sv'); // YYYY-MM-DD ตาม timezone เครื่อง
+    if (localStorage.getItem('mdn_expiry_warned') === today) return;
+    localStorage.setItem('mdn_expiry_warned', today);
+    setExpiryWarnOpen(true);
+  }, [expiringSoon]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilter = qApplied !== '' || genre !== '' || sort !== 'newest';
@@ -185,7 +203,9 @@ export function HomePage() {
           <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.brand} />
           <div>
             <strong>{user?.displayName ?? 'ผู้ใช้'}</strong>
-            <span style={styles.expiry}> · สิทธิ์ใช้งานถึง {formatExpiry(user?.accessExpiresAt ?? null)}</span>
+            <span style={expiringSoon ? styles.expiryWarn : styles.expiry}>
+              {' '}· สิทธิ์ใช้งานถึง {formatExpiry(user?.accessExpiresAt ?? null)}
+            </span>
           </div>
         </div>
         <div className="mdn-home-actions">
@@ -199,6 +219,15 @@ export function HomePage() {
       </header>
 
       <RedeemModal open={redeemOpen} onClose={() => setRedeemOpen(false)} />
+      <ExpiryWarningModal
+        open={expiryWarnOpen}
+        expiresText={formatExpiry(user?.accessExpiresAt ?? null)}
+        onTopup={() => {
+          setExpiryWarnOpen(false);
+          setRedeemOpen(true);
+        }}
+        onClose={() => setExpiryWarnOpen(false)}
+      />
 
       <main style={styles.main}>
         <h1 style={styles.ready}>หมีดูหนัง</h1>
@@ -341,6 +370,8 @@ const styles = {
   brandWrap: { display: 'flex', alignItems: 'center', gap: 10 },
   brand: { width: 40, height: 40, objectFit: 'contain' as const, borderRadius: 8, flexShrink: 0 },
   expiry: { color: '#666', fontSize: 14 },
+  // ใกล้หมด (<1 วัน) -> แดงตัวหนา
+  expiryWarn: { color: '#dc2626', fontSize: 14, fontWeight: 700 as const },
   // ปุ่ม CTA หลัก — gradient + เงา ให้เด่น
   topupButton: {
     padding: '9px 18px',

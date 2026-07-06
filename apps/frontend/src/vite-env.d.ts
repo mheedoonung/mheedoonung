@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_LIFF_ID?: string;
   // ชื่อแอปที่แสดงใน UI
   readonly VITE_APP_NAME?: string;
+  // ลิงก์ LINE OA สำหรับซื้อบัตรเติมเงิน (เช่น https://line.me/R/ti/p/@youroa) — ปล่อยว่าง = ซ่อนปุ่ม
+  readonly VITE_LINE_OA_URL?: string;
 }
 
 interface ImportMeta {
