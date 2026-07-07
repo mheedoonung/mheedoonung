@@ -76,5 +76,7 @@ export async function ensureIndexes(): Promise<void> {
     collections.feedbacks.createIndex({ createdAt: -1 }),
     // reports: admin ดูตาม status (open ก่อน) + เรียงตามเวลา
     collections.reports.createIndex({ status: 1, createdAt: -1 }),
+    // users: หน้า follow-up ของ admin query ช่วง accessExpiresAt (ใกล้หมด/เพิ่งหมด)
+    collections.users.createIndex({ accessExpiresAt: 1 }),
   ]);
 }

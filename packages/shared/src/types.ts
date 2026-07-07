@@ -183,4 +183,20 @@ export interface ReportListItem {
 }
 export interface ReportListResponse { items: ReportListItem[]; total: number; page: number; limit: number; openCount: number }
 
+// ---- ติดตามลูกค้า (admin follow-up ขายซ้ำ): user ที่สิทธิ์ใกล้หมด/เพิ่งหมด ----
+export interface FollowupUserItem {
+  id: string;
+  displayName: string;
+  pictureUrl?: string;
+  lineUserId: string;         // ไว้ค้นหา/ทักใน LINE OA
+  accessExpiresAt: string;    // ISO
+  createdAt: string;          // ไว้ดูว่าเป็นลูกค้ามานานแค่ไหน
+}
+export interface FollowupResponse {
+  soonDays: number;                    // ช่วง "ใกล้หมด" ที่ใช้ (วัน)
+  expiredDays: number;                 // ช่วง "เพิ่งหมด" ที่ใช้ (วัน)
+  expiringSoon: FollowupUserItem[];    // เรียงหมดก่อนขึ้นก่อน
+  recentlyExpired: FollowupUserItem[]; // เรียงหมดล่าสุดขึ้นก่อน
+}
+
 export interface ApiError { error: string; message?: string }

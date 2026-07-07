@@ -64,6 +64,9 @@ export function AdminLayout() {
           <NavLink to="/admin/reports" style={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}>
             แจ้งปัญหา
           </NavLink>
+          <NavLink to="/admin/followup" style={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}>
+            ติดตามลูกค้า
+          </NavLink>
         </nav>
         <div style={styles.right}>
           <span style={styles.username}>{username}</span>

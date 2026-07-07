@@ -19,6 +19,7 @@ import { AdminLayout } from './components/AdminLayout';
 import { AdminCardsPage } from './pages/AdminCardsPage';
 import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 import { AdminReportsPage } from './pages/AdminReportsPage';
+import { AdminFollowupPage } from './pages/AdminFollowupPage';
 
 export function App() {
   return (
@@ -75,6 +76,7 @@ export function App() {
           <Route path="/admin/cards" element={<AdminCardsPage />} />
           <Route path="/admin/feedback" element={<AdminFeedbackPage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
+          <Route path="/admin/followup" element={<AdminFollowupPage />} />
         </Route>
 
         {/* path อื่น ๆ -> กลับหน้าหลัก */}
