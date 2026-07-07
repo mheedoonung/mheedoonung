@@ -21,15 +21,32 @@
       // แล้ว browser cache ทับ URL นั้นไว้ 4 ชม. → MIME error ทุกครั้งจนกว่า cache หมดอายุ)
       // fetch cache:'reload' = บังคับดึงจาก network ทับ cache entry ที่เสีย แล้วค่อย reload หน้า
       (function () {
-        var KEY = 'module-retry';
-        var failed = false;
-        // sessionStorage throw ได้ (Safari private mode เก่า / in-app browser) — ห้ามพังทั้ง IIFE
-        // อ่านไม่ได้ = ถือว่า retry ไปแล้ว (ยอมไม่ retry ดีกว่าเสี่ยง reload loop)
-        function flagGet() {
-          try { return sessionStorage.getItem(KEY); } catch (e) { return '1'; }
+        // โควตา retry ต่อแท็บ (sessionStorage) — "ห้ามเคลียร์เด็ดขาด"
+        // เวอร์ชันก่อนเคลียร์ flag ตอน load สำเร็จ → chunk ที่พังหลัง load (vite:preloadError)
+        // ทำให้วน reload ไม่รู้จบ: โหลดสำเร็จ→เคลียร์→chunk พัง→reload→ซ้ำ
+        var KEY = 'module-retry-count';
+        var MAX_RETRY = 2;
+        // sessionStorage throw ได้ (private mode เก่า) — อ่านไม่ได้ = ถือว่าเต็มโควตา ไม่เสี่ยง loop
+        function count() {
+          try { return Number(sessionStorage.getItem(KEY)) || 0; } catch (e) { return MAX_RETRY; }
         }
-        function flagSet() {
-          try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+        function bump() {
+          try { sessionStorage.setItem(KEY, String(count() + 1)); } catch (e) {}
+        }
+        // ล้าง cache ของ URL ที่พัง (ถ้ารู้) แล้ว reload — ไม่เกินโควตา
+        function recover(url) {
+          if (count() >= MAX_RETRY) return; // เกินโควตา = ปล่อยให้แอป error เอง ห้ามวน
+          bump();
+          if (url) {
+            // mode:'cors' ให้ตรงกับ request ของ <script crossorigin> ที่ Vite ปล่อย
+            fetch(url, { cache: 'reload', mode: 'cors' })
+              .catch(function () {})
+              .finally(function () {
+                location.reload();
+              });
+          } else {
+            location.reload();
+          }
         }
         window.addEventListener(
           'error',
@@ -40,33 +57,16 @@
               el && el.tagName === 'SCRIPT' && el.src ? el.src
               : el && el.tagName === 'LINK' && el.rel === 'stylesheet' ? el.href
               : '';
-            if (!url) return;
-            failed = true;
-            if (flagGet()) return; // retry ครั้งเดียว กัน reload loop
-            flagSet();
-            // mode:'cors' ให้ตรงกับ request ของ <script crossorigin> ที่ Vite ปล่อย
-            // (cache entry ต้อง match ตัวที่โดนวางยา ไม่งั้นล้างไม่ออก)
-            fetch(url, { cache: 'reload', mode: 'cors' })
-              .catch(function () {})
-              .finally(function () {
-                location.reload();
-              });
+            if (url) recover(url);
           },
           true
         );
-        // lazy chunk (vidstack ฯลฯ) โหลดพัง → reload ครั้งเดียว (HTML ใหม่จะชี้ chunk ใหม่เอง)
-        window.addEventListener('vite:preloadError', function () {
-          failed = true;
-          if (flagGet()) return;
-          flagSet();
-          location.reload();
-        });
-        // โหลดสำเร็จ (ไม่มี error) = เคลียร์ flag ให้แท็บเดิม retry ได้อีกในอนาคต
-        // ห้ามเคลียร์ตอน failed — 'load' fire แม้ script พัง จะกลายเป็น reload loop
-        window.addEventListener('load', function () {
-          if (!failed) {
-            try { sessionStorage.removeItem(KEY); } catch (e) {}
-          }
+        // lazy chunk (vidstack ฯลฯ) โหลดพัง — ดึง URL จากข้อความ error มาล้าง cache ด้วยถ้าเจอ
+        window.addEventListener('vite:preloadError', function (ev) {
+          var msg = '';
+          try { msg = String((ev && ev.payload && ev.payload.message) || ''); } catch (e) {}
+          var m = msg.match(/https?:\/\/[^\s'"()]+/);
+          recover(m ? m[0] : '');
         });
       })();
     </script>

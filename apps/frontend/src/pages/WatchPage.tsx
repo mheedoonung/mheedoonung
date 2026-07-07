@@ -5,16 +5,20 @@
 //   4) heartbeat: POST /playback/refresh ทุก ~ttl/2 -> set cookie ใหม่ (เล่นต่อเนื่อง)
 //      ถ้าได้ 409 = บัญชีถูกเปิดจากอีกอุปกรณ์ -> หยุดเล่น + แจ้งผู้ใช้
 //   5) ออกจากหน้า -> POST /playback/stop (best-effort)
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vidstack/react';
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
-import type { PlaybackTokens } from '@mheedoonung/shared';
+import type { PlaybackTokens, PublicMovie, MovieListResponse } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 import { addWatchSeconds } from '../lib/feedbackGate';
 import { ReportModal } from '../components/ReportModal';
+
+// end screen: จำนวนเรื่องแนะนำ + วินาทีนับถอยหลังก่อน autoplay เรื่องแรก
+const SUGGEST_COUNT = 6;
+const AUTOPLAY_SECONDS = 10;
 
 type Phase = 'loading' | 'playing' | 'kicked' | 'error';
 
@@ -39,6 +43,10 @@ export function WatchPage() {
   //   ตรวจว่าไม่มี FS API แล้วทำ fullscreen เองด้วย CSS (เก็บ player ใน DOM) เพื่อแก้ทั้งสองข้อ.
   //   iPad/desktop/Android มี FS API -> ปล่อยใช้ของเดิม (ซับ+orientation ทำงานปกติ)
   const [reportOpen, setReportOpen] = useState(false);
+  // end screen (วิดีโอจบ): แนะนำเรื่องถัดไป + นับถอยหลัง autoplay (null = ยกเลิกแล้ว/ยังไม่เริ่ม)
+  const [ended, setEnded] = useState(false);
+  const [suggestions, setSuggestions] = useState<PublicMovie[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [noFsApi] = useState(
     () =>
       typeof document !== 'undefined' &&
@@ -48,6 +56,13 @@ export function WatchPage() {
       ),
   );
   const [fauxFs, setFauxFs] = useState(false);
+
+  // src ของ player ต้อง memo — ถ้าสร้าง object ใหม่ทุก render vidstack จะมองเป็น source ใหม่
+  // แล้ว reload วิดีโอซ้ำ (เจอตอน countdown ของ end screen ติ๊กทุก 1 วิ = reload ทุกวิ)
+  const mediaSrc = useMemo(
+    () => (fileUrl ? ({ src: fileUrl, type: 'video/mp4' } as const) : null),
+    [fileUrl],
+  );
 
   const playerRef = useRef<MediaPlayerInstance | null>(null);
   const subtitleBlobRef = useRef<string | null>(null);
@@ -137,10 +152,55 @@ export function WatchPage() {
     setShowUnmute(false);
   }
 
+  // โหลดเรื่องแนะนำสำหรับ end screen: แนวเดียวกับเรื่องที่เพิ่งจบ (popular ก่อน)
+  // ไม่พอค่อยเติมจาก popular รวม — ใช้ API เดิมทั้งหมด ไม่มี endpoint ใหม่
+  async function loadSuggestions(): Promise<void> {
+    try {
+      const collect = new Map<string, PublicMovie>();
+      const current = await api.get<PublicMovie>(`/movies/${encodeURIComponent(slug)}`);
+      const genre = current.genres[0];
+      if (genre) {
+        const byGenre = await api.get<MovieListResponse>(
+          `/movies?genre=${encodeURIComponent(genre)}&sort=popular&limit=12`,
+        );
+        for (const m of byGenre.items) if (m.slug !== slug) collect.set(m.slug, m);
+      }
+      if (collect.size < SUGGEST_COUNT) {
+        const popular = await api.get<MovieListResponse>('/movies?sort=popular&limit=12');
+        for (const m of popular.items) if (m.slug !== slug) collect.set(m.slug, m);
+      }
+      if (!aliveRef.current) return;
+      setSuggestions([...collect.values()].slice(0, SUGGEST_COUNT));
+    } catch {
+      // เงียบ — end screen ไม่มีเรื่องแนะนำก็ยังมีปุ่มดูอีกครั้ง/กลับหน้าแรก
+    }
+  }
+
+  // วิดีโอเล่นจบ -> โชว์ end screen + โหลดเรื่องแนะนำ
+  function handleEnded(): void {
+    setEnded(true);
+    void loadSuggestions();
+  }
+
+  // ดูอีกครั้ง: ปิด end screen แล้วเล่นซ้ำจากต้น (grant ยังต่ออายุอยู่ตลอดที่เปิดหน้านี้)
+  function replay(): void {
+    setEnded(false);
+    setCountdown(null);
+    const p = playerRef.current;
+    if (p) {
+      p.currentTime = 0;
+      void p.play().catch(() => {});
+    }
+  }
+
   async function startPlayback(): Promise<void> {
     setPhase('loading');
     setMessage('');
     setShowUnmute(false);
+    // เคลียร์ end screen ของเรื่องก่อนหน้า (กรณีกดเรื่องแนะนำ -> slug เปลี่ยน -> เริ่มเรื่องใหม่)
+    setEnded(false);
+    setSuggestions([]);
+    setCountdown(null);
     try {
       const tok = await api.post<PlaybackTokens>('/playback/start', { slug });
       streamIdRef.current = tok.streamId;
@@ -192,11 +252,36 @@ export function WatchPage() {
   // ทุก 10 วิ ถ้าวิดีโอกำลังเล่นอยู่ (ไม่ pause) ค่อยบวก
   useEffect(() => {
     const id = window.setInterval(() => {
-      const p = playerRef.current;
-      if (p && !p.paused) addWatchSeconds(10);
+      // try/catch: getter .paused ของ vidstack โยน TypeError ได้ถ้า player เพิ่งถูก unmount
+      // (เช่น phase เปลี่ยนเป็น kicked/error) แต่ ref ยังถือ instance เก่าอยู่
+      try {
+        const p = playerRef.current;
+        if (p && !p.paused) addWatchSeconds(10);
+      } catch {
+        // เงียบ — รอบถัดไป player ใหม่ mount แล้วนับต่อเอง
+      }
     }, 10_000);
     return () => window.clearInterval(id);
   }, []);
+
+  // เริ่มนับถอยหลัง autoplay เมื่อ end screen ขึ้นและมีเรื่องแนะนำแล้ว
+  // (กดยกเลิก -> countdown = null -> interval เดินต่อแต่ไม่ลดค่า ไม่ navigate)
+  useEffect(() => {
+    if (!ended || suggestions.length === 0) return;
+    setCountdown(AUTOPLAY_SECONDS);
+    const id = window.setInterval(() => {
+      setCountdown((c) => (c === null ? null : Math.max(0, c - 1)));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [ended, suggestions]);
+
+  // นับถึง 0 -> เล่นเรื่องแรกของรายการแนะนำ (slug เปลี่ยน -> effect [slug] เริ่มเรื่องใหม่เอง)
+  useEffect(() => {
+    if (countdown === 0 && suggestions[0]) {
+      navigate(`/watch/${encodeURIComponent(suggestions[0].slug)}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
 
   return (
     <div style={styles.page}>
@@ -220,14 +305,14 @@ export function WatchPage() {
       <div style={styles.stage}>
         {phase === 'loading' && <p style={styles.center}>กำลังเตรียมวิดีโอ...</p>}
 
-        {phase === 'playing' && fileUrl && (
+        {phase === 'playing' && mediaSrc && (
           // Vidstack player + DefaultVideoLayout = controls แบบ custom (ไม่มีปุ่ม download / เมนู native ⋮)
           // *สำคัญ*: ไม่ตั้ง crossOrigin เพื่อให้ <video> ภายในส่ง cookie ข้าม origin ไป worker (no-cors media)
           //   หมายเหตุ: เป็น cosmetic เท่านั้น — กัน rip จริงไม่ได้ (ดูดผ่าน devtools/yt-dlp ได้) ต้อง DRM ถึงจะกันจริง
           <MediaPlayer
             ref={playerRef}
             className={`mdn-player${fauxFs ? ' mdn-faux-fs' : ''}`}
-            src={{ src: fileUrl, type: 'video/mp4' }}
+            src={mediaSrc}
             autoPlay
             playsInline
             // เล่นทันทีที่เข้าหน้า: พยายามเล่นแบบมีเสียงก่อน; ถ้า browser บล็อก autoplay (ไม่มี user gesture)
@@ -246,6 +331,7 @@ export function WatchPage() {
             }}
             onContextMenu={(e) => e.preventDefault()}
             onError={() => setMessage('โหลดวิดีโอมีปัญหา (ตรวจว่า video-worker ทำงานและไฟล์อยู่บน R2)')}
+            onEnded={handleEnded}
           >
             <MediaProvider />
             {/* ซับแบบ soft (.srt) — vidstack parse SRT ฝั่ง client เองได้ ไม่ต้องแปลงเป็น .vtt
@@ -286,6 +372,50 @@ export function WatchPage() {
               }
             />
           </MediaPlayer>
+        )}
+
+        {/* end screen: วิดีโอจบ -> แนะนำเรื่องถัดไป + นับถอยหลัง autoplay เรื่องแรก */}
+        {phase === 'playing' && ended && (
+          <div style={styles.endOverlay}>
+            <p style={styles.endTitle}>ดูจบแล้ว 🎬</p>
+            {suggestions.length > 0 && (
+              <>
+                <p style={styles.endSub}>
+                  {countdown !== null ? (
+                    <>
+                      กำลังจะเล่น <strong>{suggestions[0]?.title}</strong> ใน {countdown} วินาที
+                      <button type="button" style={styles.cancelBtn} onClick={() => setCountdown(null)}>
+                        ยกเลิก
+                      </button>
+                    </>
+                  ) : (
+                    'เรื่องถัดไปที่น่าจะชอบ'
+                  )}
+                </p>
+                <div style={styles.suggestGrid}>
+                  {suggestions.map((m, i) => (
+                    <button
+                      key={m.slug}
+                      type="button"
+                      style={i === 0 && countdown !== null ? styles.suggestCardNext : styles.suggestCard}
+                      onClick={() => navigate(`/watch/${encodeURIComponent(m.slug)}`)}
+                    >
+                      <img src={m.posterUrl} alt={m.title} style={styles.suggestPoster} loading="lazy" />
+                      <span style={styles.suggestTitle}>{m.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <div style={styles.endActions}>
+              <button type="button" style={styles.btn} onClick={replay}>
+                ↻ ดูอีกครั้ง
+              </button>
+              <Link to="/" style={styles.endHomeLink}>
+                ← กลับหน้าแรก
+              </Link>
+            </div>
+          </div>
         )}
 
         {/* autoplay ถูกบล็อก -> เล่นแบบ mute: ปุ่มให้ผู้ใช้แตะเปิดเสียง (วางบนสุด ไม่ทับ control bar) */}
@@ -391,6 +521,66 @@ const styles = {
     marginLeft: 10,
   },
   softError: { color: '#ffb3b3', textAlign: 'center' as const, padding: '8px 16px', fontSize: 13 },
+  // ---- end screen (วิดีโอจบ) ----
+  endOverlay: {
+    position: 'absolute' as const,
+    inset: 0,
+    zIndex: 15, // ทับ player/control แต่ใต้ navbar (20)
+    background: 'rgba(0,0,0,0.88)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 60px) 20px 24px',
+    overflowY: 'auto' as const,
+  },
+  endTitle: { fontSize: 22, fontWeight: 700, margin: 0 },
+  endSub: { color: '#ccc', fontSize: 15, margin: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, justifyContent: 'center' },
+  cancelBtn: {
+    padding: '4px 14px',
+    background: 'transparent',
+    color: '#fff',
+    border: '1px solid rgba(255,255,255,0.5)',
+    borderRadius: 999,
+    fontSize: 13,
+    cursor: 'pointer',
+  },
+  suggestGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 130px))',
+    justifyContent: 'center',
+    gap: 12,
+    width: '100%',
+    maxWidth: 860,
+  },
+  suggestCard: {
+    background: 'transparent',
+    border: '2px solid transparent',
+    borderRadius: 10,
+    padding: 4,
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 6,
+    color: '#eee',
+  },
+  // เรื่องแรก (กำลังจะ autoplay) — ขอบแดง highlight
+  suggestCardNext: {
+    background: 'transparent',
+    border: '2px solid #e50914',
+    borderRadius: 10,
+    padding: 4,
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 6,
+    color: '#fff',
+  },
+  suggestPoster: { width: '100%', aspectRatio: '2 / 3', objectFit: 'cover' as const, borderRadius: 6, display: 'block', background: '#222' },
+  suggestTitle: { fontSize: 13, lineHeight: 1.3, textAlign: 'center' as const },
+  endActions: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 },
+  endHomeLink: { color: '#bbb', textDecoration: 'none', fontSize: 15 },
   unmuteBtn: {
     position: 'absolute' as const,
     top: 16,
