@@ -238,7 +238,8 @@ export function HomePage() {
             <h2 style={styles.sectionTitle}>รายการหนัง</h2>
             {total > 0 && (
               <span style={styles.resultCount}>
-                ทั้งหมด {total} เรื่อง · หน้า {page}/{totalPages}
+                {/* ทั้งหมด {total} เรื่อง · หน้า {page}/{totalPages} */}
+                หน้า {page}/{totalPages}
               </span>
             )}
           </div>
