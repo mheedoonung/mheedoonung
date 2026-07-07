@@ -113,4 +113,42 @@ export interface PlaybackTokens {
 export type PlaybackStartResponse = PlaybackTokens;
 export type PlaybackRefreshResponse = PlaybackTokens;
 
+// ---- Feedback จากผู้ใช้ ----
+// เกณฑ์เด้งถาม (ดูครบ 30 นาที/ไม่กวนซ้ำ) อยู่ฝั่ง frontend ทั้งหมด: localStorage (lib/feedbackGate)
+// chips ให้เลือกตอนให้คะแนน — whitelist ฝั่ง backend กรองค่าที่ไม่อยู่ในลิสต์ทิ้ง
+export const FEEDBACK_TAGS = [
+  'โหลดช้า/กระตุก',
+  'หนังน้อย/ไม่มีเรื่องที่อยากดู',
+  'ใช้งานยาก',
+  'ราคา/บัตรเติมเงิน',
+  'อื่นๆ',
+] as const;
+export interface Feedback {
+  _id?: string;
+  userId: string;
+  rating: number;        // 1-5 ดาว
+  tags: string[];        // subset ของ FEEDBACK_TAGS
+  text?: string;         // ข้อความเพิ่มเติม (optional, ≤1000 ตัวอักษร)
+  watchSeconds: number;  // เวลาดูสะสมตอนส่ง — client รายงานเอง (localStorage) ใช้ประกอบการอ่านเท่านั้น
+  createdAt: string;
+}
+export interface FeedbackBody { rating: number; tags?: string[]; text?: string; watchedSeconds?: number }
+// รายการ feedback ฝั่ง admin (แนบชื่อ user; null = user ถูกลบไปแล้ว)
+export interface FeedbackListItem {
+  id: string;
+  rating: number;
+  tags: string[];
+  text?: string;
+  watchSeconds: number;
+  createdAt: string;
+  user: { displayName: string; pictureUrl?: string } | null;
+}
+export interface FeedbackListResponse { items: FeedbackListItem[]; total: number; page: number; limit: number }
+export interface FeedbackSummaryResponse {
+  total: number;                                  // จำนวน feedback ทั้งหมด
+  avgRating: number | null;                       // คะแนนเฉลี่ย (null = ยังไม่มีข้อมูล)
+  byRating: { rating: number; count: number }[];  // histogram 1-5 ดาว
+  byTag: { tag: string; count: number }[];        // จำนวนต่อ chip (เรียงมาก->น้อย)
+}
+
 export interface ApiError { error: string; message?: string }

@@ -1,3 +1,6 @@
 # secret สำหรับ wrangler dev (คัดลอกเป็น .dev.vars)
 # ต้องตรงกับ VIDEO_GRANT_SECRET ของ backend (apps/backend/.env) ไม่งั้น worker จะ verify grant ไม่ผ่าน
 VIDEO_GRANT_SECRET=dev-video-secret-change-me
+# override ALLOWED_ORIGIN (wrangler.toml ตั้งเป็นโดเมน prod) — ไม่ตั้งแล้วดูวิดีโอจาก vite dev ไม่ได้ (CORS)
+ALLOWED_ORIGIN=http://localhost:5173
+ENVIRONMENT=development

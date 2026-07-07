@@ -3,8 +3,9 @@
 //   /login        : หน้าเข้าสู่ระบบด้วย LINE
 //   /redeem       : หน้าเติมบัตร (ต้อง login)
 //   /             : หน้าหลัก user area (ต้อง login + active)
-//   /admin        : หน้าเข้าสู่ระบบแอดมิน
-//   /admin/cards  : หน้าจัดการบัตร (guard ภายในหน้าผ่าน /admin/me)
+//   /admin          : หน้าเข้าสู่ระบบแอดมิน
+//   /admin/cards    : หน้าจัดการบัตร (อยู่ใต้ AdminLayout — guard /admin/me ที่ layout)
+//   /admin/feedback : หน้าดู feedback (อยู่ใต้ AdminLayout เช่นกัน)
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -14,7 +15,9 @@ import { HomePage } from './pages/HomePage';
 import { MovieDetailPage } from './pages/MovieDetailPage';
 import { WatchPage } from './pages/WatchPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminLayout } from './components/AdminLayout';
 import { AdminCardsPage } from './pages/AdminCardsPage';
+import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 
 export function App() {
   return (
@@ -65,9 +68,12 @@ export function App() {
           }
         />
 
-        {/* ส่วนแอดมิน */}
+        {/* ส่วนแอดมิน — หน้าใน (cards/feedback) อยู่ใต้ AdminLayout: guard + เมนูร่วมกัน */}
         <Route path="/admin" element={<AdminLoginPage />} />
-        <Route path="/admin/cards" element={<AdminCardsPage />} />
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/cards" element={<AdminCardsPage />} />
+          <Route path="/admin/feedback" element={<AdminFeedbackPage />} />
+        </Route>
 
         {/* path อื่น ๆ -> กลับหน้าหลัก */}
         <Route path="*" element={<Navigate to="/" replace />} />

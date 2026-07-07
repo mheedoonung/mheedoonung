@@ -1,7 +1,7 @@
 // หน้าหลักของผู้ใช้ — เข้าได้เมื่อ login และ active แล้ว (ตรวจผ่าน ProtectedRoute requireActive)
 // - แสดงข้อความต้อนรับ + วันหมดอายุสิทธิ์
 // - ดึง /movies (MovieListResponse) มาแสดงเป็น grid โปสเตอร์ (player เป็นเฟสถัดไป)
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type {
   PublicMovie,
@@ -13,6 +13,8 @@ import { api } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { RedeemModal } from '../components/RedeemModal';
 import { ExpiryWarningModal } from '../components/ExpiryWarningModal';
+import { FeedbackModal } from '../components/FeedbackModal';
+import { shouldAskFeedback } from '../lib/feedbackGate';
 
 // เกณฑ์ "ใกล้หมด" = เหลือน้อยกว่า 1 วัน
 const DAY_MS = 20 * 60 * 60 * 1000;
@@ -76,6 +78,9 @@ export function HomePage() {
   const [hotIds, setHotIds] = useState<Set<string>>(new Set());
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [expiryWarnOpen, setExpiryWarnOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // เด้ง feedback ได้ครั้งเดียวต่อการเข้าหน้านี้ (server คุมความถี่ระยะยาวผ่าน shouldAskFeedback)
+  const feedbackShownRef = useRef(false);
 
   // เหลือเวลาใช้งาน < 1 วัน (และยังไม่หมด) -> ใกล้หมด
   const msLeft = user?.accessExpiresAt ? new Date(user.accessExpiresAt).getTime() - Date.now() : null;
@@ -87,8 +92,24 @@ export function HomePage() {
     const today = new Date().toLocaleDateString('sv'); // YYYY-MM-DD ตาม timezone เครื่อง
     if (localStorage.getItem('mdn_expiry_warned') === today) return;
     localStorage.setItem('mdn_expiry_warned', today);
+    // เตือนหมดอายุรอบนี้แล้ว — บล็อค feedback modal ไว้เลย (effect นี้รันก่อน ref จึงถึงก่อน state)
+    feedbackShownRef.current = true;
     setExpiryWarnOpen(true);
   }, [expiringSoon]);
+
+  // เด้งถาม feedback เมื่อเข้าเกณฑ์ — logic ทั้งหมดอยู่ localStorage (ดู lib/feedbackGate)
+  // มี modal อื่นเปิดอยู่ (เตือนหมดอายุสำคัญกว่า) = ข้ามไป ไม่เด้งต่อคิวกัน
+  // mark ref ตอน timer "ยิงจริง" เท่านั้น — ถ้า mark ตอน schedule จะโดน StrictMode (dev)
+  //   รัน effect ซ้ำสองรอบ: รอบแรก mark+ล้าง timer ทิ้ง รอบสอง ref เป็น true แล้ว → ไม่เด้งเลย
+  useEffect(() => {
+    if (feedbackShownRef.current || !shouldAskFeedback()) return;
+    if (expiryWarnOpen || redeemOpen) return;
+    const id = window.setTimeout(() => {
+      feedbackShownRef.current = true;
+      setFeedbackOpen(true);
+    }, 1200);
+    return () => window.clearTimeout(id);
+  }, [expiryWarnOpen, redeemOpen]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilter = qApplied !== '' || genre !== '' || sort !== 'newest';
@@ -219,6 +240,7 @@ export function HomePage() {
       </header>
 
       <RedeemModal open={redeemOpen} onClose={() => setRedeemOpen(false)} />
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <ExpiryWarningModal
         open={expiryWarnOpen}
         expiresText={formatExpiry(user?.accessExpiresAt ?? null)}

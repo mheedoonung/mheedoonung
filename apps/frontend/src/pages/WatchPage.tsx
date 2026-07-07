@@ -13,6 +13,7 @@ import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
 import type { PlaybackTokens } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
+import { addWatchSeconds } from '../lib/feedbackGate';
 
 type Phase = 'loading' | 'playing' | 'kicked' | 'error';
 
@@ -184,6 +185,16 @@ export function WatchPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
+
+  // นับเวลาดูสะสมลง localStorage (ขับเกณฑ์เด้งถาม feedback — ดู lib/feedbackGate)
+  // ทุก 10 วิ ถ้าวิดีโอกำลังเล่นอยู่ (ไม่ pause) ค่อยบวก
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const p = playerRef.current;
+      if (p && !p.paused) addWatchSeconds(10);
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <div style={styles.page}>

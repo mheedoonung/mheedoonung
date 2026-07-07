@@ -1,7 +1,7 @@
 // การเชื่อมต่อ MongoDB ด้วย official driver (singleton)
 // _id ใน DB เป็น ObjectId ภายใน; เวลาส่งออก API จะแปลงเป็น string เอง (ดู toApi helper)
 import { MongoClient, type Db, type Collection } from 'mongodb';
-import type { User, Card, Admin, Movie } from '@mheedoonung/shared';
+import type { User, Card, Admin, Movie, Feedback } from '@mheedoonung/shared';
 import { env } from '../config/env';
 
 // หมายเหตุ: type ของ collection ใช้ Omit<..., '_id'> เพราะ driver จัดการ _id เป็น ObjectId เอง
@@ -10,6 +10,7 @@ type UserDoc = Omit<User, '_id'>;
 type CardDoc = Omit<Card, '_id'>;
 type AdminDoc = Omit<Admin, '_id'>;
 type MovieDoc = Omit<Movie, '_id'>;
+type FeedbackDoc = Omit<Feedback, '_id'>;
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
@@ -47,6 +48,9 @@ export const collections = {
   get movies(): Collection<MovieDoc> {
     return getDb().collection<MovieDoc>('movies');
   },
+  get feedbacks(): Collection<FeedbackDoc> {
+    return getDb().collection<FeedbackDoc>('feedbacks');
+  },
 };
 
 // สร้าง index ที่จำเป็น (idempotent — เรียกซ้ำได้)
@@ -63,5 +67,8 @@ export async function ensureIndexes(): Promise<void> {
     collections.movies.createIndex({ status: 1, viewCount: -1 }),
     collections.movies.createIndex({ status: 1, title: 1 }), // รองรับ sort=title ไม่ให้ทำ in-memory SORT
     collections.movies.createIndex({ genres: 1 }),
+    // feedbacks: query ตาม user + เรียงดูตามเวลา (ส่งซ้ำได้ไม่จำกัด — ไม่ unique)
+    collections.feedbacks.createIndex({ userId: 1 }),
+    collections.feedbacks.createIndex({ createdAt: -1 }),
   ]);
 }

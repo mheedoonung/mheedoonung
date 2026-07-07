@@ -37,14 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // ดึง /me — อัปเดต user (null ถ้ายังไม่ login หรือ error)
+  // ดึง /me — อัปเดต user ตามที่ server ตอบ (res.user เป็น null = ไม่ได้ login แล้วจริง)
+  // network error ชั่วคราว -> คง user เดิมไว้ (อย่าเผลอดีดคนที่ session ยังดีออกไป login)
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const res = await api.get<MeResponse>('/me');
       setUser(res.user);
     } catch {
-      // error (เช่นเรียกไม่ได้) -> ถือว่ายังไม่ login
-      setUser(null);
+      // เงียบ — ค่าเดิมยังใช้ได้อยู่
     }
   }, []);
 

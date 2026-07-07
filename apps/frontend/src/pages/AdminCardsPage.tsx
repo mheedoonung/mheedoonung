@@ -1,9 +1,7 @@
-// หน้าจัดการบัตรของแอดมิน (route /admin/cards)
-// - ตรวจสิทธิ์แอดมินผ่าน GET /admin/me ตอน mount; ถ้าไม่ใช่แอดมิน -> เด้งไป /admin
+// หน้าจัดการบัตรของแอดมิน (route /admin/cards — อยู่ใต้ AdminLayout, สิทธิ์ถูกเช็คที่ layout แล้ว)
 // - ฟอร์มสร้างบัตร (days, quantity, note) -> POST /admin/cards แสดง codes ที่สร้าง
 // - ตาราง GET /admin/cards (กรองตาม status + แบ่งหน้า) + ปุ่ม revoke บัตร unused
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type {
   CardListItem,
   CardListResponse,
@@ -49,11 +47,6 @@ function statusLabel(s: CardStatus): string {
 }
 
 export function AdminCardsPage() {
-  const navigate = useNavigate();
-
-  // สถานะการตรวจสิทธิ์แอดมิน: 'checking' | 'authorized' | 'denied'
-  const [authState, setAuthState] = useState<'checking' | 'authorized' | 'denied'>('checking');
-
   // ---- state ของฟอร์มสร้างบัตร ----
   const [days, setDays] = useState('30');
   const [quantity, setQuantity] = useState('1');
@@ -77,29 +70,6 @@ export function AdminCardsPage() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
-  // ตรวจสิทธิ์แอดมินตอน mount
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        await api.get<{ admin: { username: string } }>('/admin/me');
-        if (active) setAuthState('authorized');
-      } catch {
-        if (active) setAuthState('denied');
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // ถ้าไม่ใช่แอดมิน -> เด้งไปหน้า login แอดมิน
-  useEffect(() => {
-    if (authState === 'denied') {
-      navigate('/admin', { replace: true });
-    }
-  }, [authState, navigate]);
-
   // โหลดรายการบัตร (ตาม page + status filter ปัจจุบัน)
   const loadCards = useCallback(async (): Promise<void> => {
     setListLoading(true);
@@ -119,12 +89,10 @@ export function AdminCardsPage() {
     }
   }, [page, statusFilter]);
 
-  // โหลดรายการบัตรเมื่อได้รับสิทธิ์ หรือเมื่อ page/filter เปลี่ยน
+  // โหลดรายการบัตรเมื่อ page/filter เปลี่ยน
   useEffect(() => {
-    if (authState === 'authorized') {
-      void loadCards();
-    }
-  }, [authState, loadCards]);
+    void loadCards();
+  }, [loadCards]);
 
   // โหลดสรุปยอด (ตามช่วงวันที่) — ส่ง from/to เป็นขอบ ISO ของวัน (เวลาเครื่อง admin)
   const loadSummary = useCallback(async (): Promise<void> => {
@@ -144,10 +112,8 @@ export function AdminCardsPage() {
   }, [fromDate, toDate]);
 
   useEffect(() => {
-    if (authState === 'authorized') {
-      void loadSummary();
-    }
-  }, [authState, loadSummary]);
+    void loadSummary();
+  }, [loadSummary]);
 
   // สร้างบัตรใหม่
   const handleCreate = async (e: FormEvent): Promise<void> => {
@@ -213,19 +179,9 @@ export function AdminCardsPage() {
   // จำนวนหน้าทั้งหมด
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
-  // ระหว่างตรวจสิทธิ์
-  if (authState === 'checking') {
-    return <div style={{ padding: 24 }}>กำลังตรวจสอบสิทธิ์...</div>;
-  }
-  // denied จะถูก redirect ใน effect ด้านบน — แสดงข้อความชั่วคราว
-  if (authState === 'denied') {
-    return <div style={{ padding: 24 }}>กำลังพาไปหน้าเข้าสู่ระบบ...</div>;
-  }
-
   return (
-    <div style={styles.page}>
-      <main style={styles.main}>
-        <h1 style={styles.title}>จัดการบัตร</h1>
+    <main style={styles.main}>
+      <h1 style={styles.title}>จัดการบัตร</h1>
 
         {/* ฟอร์มสร้างบัตร */}
         <section style={styles.section}>
@@ -426,13 +382,11 @@ export function AdminCardsPage() {
             </div>
           )}
         </section>
-      </main>
-    </div>
+    </main>
   );
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: '#fafafa' },
   main: { maxWidth: 900, margin: '0 auto', padding: 24 },
   title: { fontSize: 26, marginBottom: 16 },
   section: {
