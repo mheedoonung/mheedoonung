@@ -14,6 +14,7 @@ import '@vidstack/react/player/styles/default/layouts/video.css';
 import type { PlaybackTokens } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 import { addWatchSeconds } from '../lib/feedbackGate';
+import { ReportModal } from '../components/ReportModal';
 
 type Phase = 'loading' | 'playing' | 'kicked' | 'error';
 
@@ -37,6 +38,7 @@ export function WatchPage() {
   //   (1) ไม่ render ซับแบบ overlay ของ Vidstack (2) บังคับแนวนอน -> หนังแนวตั้งเล็กลง.
   //   ตรวจว่าไม่มี FS API แล้วทำ fullscreen เองด้วย CSS (เก็บ player ใน DOM) เพื่อแก้ทั้งสองข้อ.
   //   iPad/desktop/Android มี FS API -> ปล่อยใช้ของเดิม (ซับ+orientation ทำงานปกติ)
+  const [reportOpen, setReportOpen] = useState(false);
   const [noFsApi] = useState(
     () =>
       typeof document !== 'undefined' &&
@@ -204,8 +206,16 @@ export function WatchPage() {
         <Link to="/" style={styles.back}>
           ← กลับ
         </Link>
-        <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.barLogo} />
+        <div style={styles.barRight}>
+          <button type="button" style={styles.reportBtn} onClick={() => setReportOpen(true)}>
+            ⚠️ แจ้งปัญหา
+          </button>
+          <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.barLogo} />
+        </div>
       </div>
+
+      {/* modal แจ้งปัญหา — แนบ slug เรื่องที่กำลังดูให้อัตโนมัติ */}
+      <ReportModal open={reportOpen} movieSlug={slug} onClose={() => setReportOpen(false)} />
 
       <div style={styles.stage}>
         {phase === 'loading' && <p style={styles.center}>กำลังเตรียมวิดีโอ...</p>}
@@ -302,6 +312,9 @@ export function WatchPage() {
             <button type="button" style={styles.btn} onClick={() => void startPlayback()}>
               ลองใหม่
             </button>
+            <button type="button" style={styles.btnGhost} onClick={() => setReportOpen(true)}>
+              แจ้งปัญหานี้
+            </button>
           </div>
         )}
       </div>
@@ -329,8 +342,20 @@ const styles = {
     background: 'transparent',
     pointerEvents: 'none' as const,
   },
-  // back/logo รับ tap เอง (bar เป็น none) + drop shadow ให้อ่านออกบนวิดีโอสว่าง
+  // back/logo/ปุ่มแจ้งปัญหา รับ tap เอง (bar เป็น none) + drop shadow ให้อ่านออกบนวิดีโอสว่าง
   back: { color: '#fff', textDecoration: 'none', fontSize: 15, pointerEvents: 'auto' as const, textShadow: '0 1px 3px rgba(0,0,0,0.8)' },
+  barRight: { display: 'flex', alignItems: 'center', gap: 12 },
+  reportBtn: {
+    pointerEvents: 'auto' as const,
+    padding: '6px 12px',
+    background: 'rgba(0,0,0,0.55)',
+    color: '#fff',
+    border: '1px solid rgba(255,255,255,0.35)',
+    borderRadius: 999,
+    fontSize: 13,
+    cursor: 'pointer',
+    backdropFilter: 'blur(4px)',
+  },
   barLogo: { width: 36, height: 36, objectFit: 'contain' as const, pointerEvents: 'auto' as const, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' },
   stage: {
     flex: 1,
@@ -353,6 +378,17 @@ const styles = {
     borderRadius: 8,
     fontSize: 15,
     cursor: 'pointer',
+  },
+  // ปุ่มรองใน overlay (แจ้งปัญหา) — โปร่ง ไม่แย่งเด่นกับปุ่มลองใหม่
+  btnGhost: {
+    padding: '10px 20px',
+    background: 'transparent',
+    color: '#bbb',
+    border: '1px solid #555',
+    borderRadius: 8,
+    fontSize: 15,
+    cursor: 'pointer',
+    marginLeft: 10,
   },
   softError: { color: '#ffb3b3', textAlign: 'center' as const, padding: '8px 16px', fontSize: 13 },
   unmuteBtn: {

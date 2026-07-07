@@ -151,4 +151,36 @@ export interface FeedbackSummaryResponse {
   byTag: { tag: string; count: number }[];        // จำนวนต่อ chip (เรียงมาก->น้อย)
 }
 
+// ---- แจ้งปัญหา (user กดแจ้งเองตอนเจอปัญหา — ต่างจาก feedback ที่ระบบเด้งถาม) ----
+export const REPORT_CATEGORIES = [
+  'ดูวิดีโอไม่ได้',
+  'กระตุก/โหลดช้า',
+  'เสียง/ซับผิดปกติ',
+  'บัตรเติมเงิน/สิทธิ์ใช้งาน',
+  'อื่นๆ',
+] as const;
+export type ReportStatus = 'open' | 'resolved';
+export interface Report {
+  _id?: string;
+  userId: string;
+  category: string;   // หนึ่งใน REPORT_CATEGORIES
+  text: string;       // รายละเอียดจาก user (บังคับ)
+  // context แนบอัตโนมัติจาก client/server ช่วย debug — user ไม่ต้องพิมพ์เอง
+  context?: { path?: string; movieSlug?: string; userAgent?: string };
+  status: ReportStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ReportBody { category: string; text: string; path?: string; movieSlug?: string }
+export interface ReportListItem {
+  id: string;
+  category: string;
+  text: string;
+  context?: Report['context'];
+  status: ReportStatus;
+  createdAt: string;
+  user: { displayName: string; pictureUrl?: string } | null;
+}
+export interface ReportListResponse { items: ReportListItem[]; total: number; page: number; limit: number; openCount: number }
+
 export interface ApiError { error: string; message?: string }

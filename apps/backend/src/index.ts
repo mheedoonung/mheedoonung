@@ -10,6 +10,7 @@ import { cardRoutes } from './routes/cards';
 import { movieRoutes } from './routes/movies';
 import { playbackRoutes } from './routes/playback';
 import { feedbackRoutes } from './routes/feedback';
+import { reportRoutes } from './routes/reports';
 
 // เชื่อมต่อ MongoDB ให้เสร็จก่อนเปิดรับ request (connectMongo จะเรียก ensureIndexes ให้ด้วย)
 // ทำเป็น top-level await ก่อน .listen() เพื่อกัน race ช่วง startup:
@@ -42,6 +43,7 @@ const app = new Elysia()
   .use(movieRoutes)
   .use(playbackRoutes)
   .use(feedbackRoutes)
+  .use(reportRoutes)
   .listen(env.PORT);
 
 console.log(`[backend] กำลังรันที่ http://localhost:${env.PORT}`);

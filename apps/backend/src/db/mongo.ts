@@ -1,7 +1,7 @@
 // การเชื่อมต่อ MongoDB ด้วย official driver (singleton)
 // _id ใน DB เป็น ObjectId ภายใน; เวลาส่งออก API จะแปลงเป็น string เอง (ดู toApi helper)
 import { MongoClient, type Db, type Collection } from 'mongodb';
-import type { User, Card, Admin, Movie, Feedback } from '@mheedoonung/shared';
+import type { User, Card, Admin, Movie, Feedback, Report } from '@mheedoonung/shared';
 import { env } from '../config/env';
 
 // หมายเหตุ: type ของ collection ใช้ Omit<..., '_id'> เพราะ driver จัดการ _id เป็น ObjectId เอง
@@ -11,6 +11,7 @@ type CardDoc = Omit<Card, '_id'>;
 type AdminDoc = Omit<Admin, '_id'>;
 type MovieDoc = Omit<Movie, '_id'>;
 type FeedbackDoc = Omit<Feedback, '_id'>;
+type ReportDoc = Omit<Report, '_id'>;
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
@@ -51,6 +52,9 @@ export const collections = {
   get feedbacks(): Collection<FeedbackDoc> {
     return getDb().collection<FeedbackDoc>('feedbacks');
   },
+  get reports(): Collection<ReportDoc> {
+    return getDb().collection<ReportDoc>('reports');
+  },
 };
 
 // สร้าง index ที่จำเป็น (idempotent — เรียกซ้ำได้)
@@ -70,5 +74,7 @@ export async function ensureIndexes(): Promise<void> {
     // feedbacks: query ตาม user + เรียงดูตามเวลา (ส่งซ้ำได้ไม่จำกัด — ไม่ unique)
     collections.feedbacks.createIndex({ userId: 1 }),
     collections.feedbacks.createIndex({ createdAt: -1 }),
+    // reports: admin ดูตาม status (open ก่อน) + เรียงตามเวลา
+    collections.reports.createIndex({ status: 1, createdAt: -1 }),
   ]);
 }

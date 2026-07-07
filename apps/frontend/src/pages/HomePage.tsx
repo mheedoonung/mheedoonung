@@ -14,6 +14,7 @@ import { useAuth } from '../auth/AuthContext';
 import { RedeemModal } from '../components/RedeemModal';
 import { ExpiryWarningModal } from '../components/ExpiryWarningModal';
 import { FeedbackModal } from '../components/FeedbackModal';
+import { ReportModal } from '../components/ReportModal';
 import { shouldAskFeedback } from '../lib/feedbackGate';
 
 // เกณฑ์ "ใกล้หมด" = เหลือน้อยกว่า 1 วัน
@@ -79,6 +80,7 @@ export function HomePage() {
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [expiryWarnOpen, setExpiryWarnOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   // เด้ง feedback ได้ครั้งเดียวต่อการเข้าหน้านี้ (server คุมความถี่ระยะยาวผ่าน shouldAskFeedback)
   const feedbackShownRef = useRef(false);
 
@@ -233,6 +235,9 @@ export function HomePage() {
           <button type="button" onClick={() => setRedeemOpen(true)} style={styles.topupButton}>
             + เติมเวลา
           </button>
+          <button type="button" onClick={() => setReportOpen(true)} style={styles.reportButton}>
+            แจ้งปัญหา
+          </button>
           <button type="button" onClick={handleLogout} style={styles.logoutButton}>
             ออกจากระบบ
           </button>
@@ -241,6 +246,7 @@ export function HomePage() {
 
       <RedeemModal open={redeemOpen} onClose={() => setRedeemOpen(false)} />
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <ReportModal open={reportOpen} onClose={() => setReportOpen(false)} />
       <ExpiryWarningModal
         open={expiryWarnOpen}
         expiresText={formatExpiry(user?.accessExpiresAt ?? null)}
@@ -408,6 +414,18 @@ const styles = {
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
     boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
+  },
+  // แจ้งปัญหา — ปุ่มรอง outline กลางๆ ไม่แย่งเด่น
+  reportButton: {
+    padding: '9px 14px',
+    background: '#fff',
+    color: '#555',
+    border: '1px solid #ddd',
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
   // ออกจากระบบ = destructive -> แดง (outline อ่อน ไม่แย่งเด่นกับ CTA)
   logoutButton: {
