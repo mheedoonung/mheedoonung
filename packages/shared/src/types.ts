@@ -199,4 +199,20 @@ export interface FollowupResponse {
   recentlyExpired: FollowupUserItem[]; // เรียงหมดล่าสุดขึ้นก่อน
 }
 
+// ---- Dashboard สรุปการใช้งาน (pre-aggregated รายวัน — ดู lib/stats.ts ฝั่ง backend) ----
+export interface StatPoint {
+  key: string;         // 'YYYY-MM-DD' (รายวัน) หรือ 'YYYY-MM' (รายเดือน)
+  plays: number;       // จำนวนกดเริ่มดูหนัง
+  activeUsers: number; // คนดูไม่ซ้ำ (รายเดือน = ผลรวม DAU รายวัน ไม่ใช่ MAU จริง)
+  newUsers: number;    // สมัครใหม่
+  redeems: number;     // จำนวนบัตรที่ถูกเติม
+  daysSold: number;    // รวมจำนวนวันของบัตรที่ถูกเติม (ตัวแทนยอดขาย)
+}
+export type DashboardView = 'daily' | 'monthly';
+export interface DashboardResponse {
+  view: DashboardView;
+  today: StatPoint;      // สรุปของวันนี้ (เวลาไทย)
+  series: StatPoint[];   // รายวัน 30 จุด หรือรายเดือน 12 จุด (เรียงเก่า -> ใหม่, เติมศูนย์วันที่ไม่มีข้อมูล)
+}
+
 export interface ApiError { error: string; message?: string }

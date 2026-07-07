@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import type { User } from '@mheedoonung/shared';
 import { env } from '../config/env';
 import { collections } from '../db/mongo';
+import { trackNewUser } from './stats';
 
 // endpoint ของ LINE (คงที่ตามเอกสาร LINE Login v2.1)
 const LINE_AUTHORIZE_URL = 'https://access.line.me/oauth2/v2.1/authorize';
@@ -162,6 +163,11 @@ export async function upsertUserFromLine(profile: LineProfile): Promise<User> {
   // หลัง upsert ด้วย returnDocument:'after' ควรได้ doc กลับมาเสมอ
   if (!result) {
     throw new Error('upsert_user_failed');
+  }
+
+  // เพิ่งถูกสร้างรอบนี้ (insert) = createdAt ตรงกับ now เป๊ะ -> นับสมัครใหม่ (fire-and-forget)
+  if (result.createdAt === now) {
+    void trackNewUser();
   }
 
   // แปลง _id (ObjectId) -> string ก่อนส่งคืน (เทียบกับ shared type ที่ใช้ string)

@@ -13,6 +13,7 @@ import type {
 import { sessionPlugin, isActive } from '../plugins/session';
 import { collections } from '../db/mongo';
 import { newStreamId, buildPlaybackTokens } from '../lib/playback';
+import { trackPlay } from '../lib/stats';
 
 export const playbackRoutes = new Elysia()
   .use(sessionPlugin)
@@ -57,6 +58,9 @@ export const playbackRoutes = new Elysia()
         }),
         collections.movies.updateOne({ _id: movie._id } as any, { $inc: { viewCount: 1 } }),
       ]);
+
+      // สถิติ dashboard — fire-and-forget (lib/stats กลืน error เอง ไม่กระทบ playback)
+      void trackPlay(userId);
 
       return buildPlaybackTokens({
         userId,

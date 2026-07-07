@@ -10,6 +10,7 @@ import type {
 } from '@mheedoonung/shared';
 import { sessionPlugin } from '../plugins/session';
 import { rateLimit } from '../lib/rateLimit';
+import { trackRedeem } from '../lib/stats';
 import {
   createCards,
   redeemCard,
@@ -48,6 +49,8 @@ export const cardRoutes = new Elysia()
       }
       try {
         const { accessExpiresAt, daysAdded } = await redeemCard(body.code, currentUser);
+        // สถิติ dashboard — fire-and-forget (lib/stats กลืน error เอง ไม่กระทบ redeem)
+        void trackRedeem(daysAdded);
         const res: RedeemResponse = { ok: true, accessExpiresAt, daysAdded };
         return res;
       } catch (err) {

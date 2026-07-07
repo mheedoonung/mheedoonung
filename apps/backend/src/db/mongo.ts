@@ -12,6 +12,17 @@ type AdminDoc = Omit<Admin, '_id'>;
 type MovieDoc = Omit<Movie, '_id'>;
 type FeedbackDoc = Omit<Feedback, '_id'>;
 type ReportDoc = Omit<Report, '_id'>;
+// สถิติรายวัน (dashboard) — _id เป็น string 'YYYY-MM-DD' ไม่ใช่ ObjectId
+type DailyStatDoc = {
+  _id: string;
+  plays?: number;
+  activeUsers?: number;
+  newUsers?: number;
+  redeems?: number;
+  daysSold?: number;
+};
+// marker กันนับ user ซ้ำในวัน — _id = 'YYYY-MM-DD:userId', createdAt เป็น Date เพื่อใช้ TTL
+type DailyActiveDoc = { _id: string; createdAt: Date };
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
@@ -55,7 +66,36 @@ export const collections = {
   get reports(): Collection<ReportDoc> {
     return getDb().collection<ReportDoc>('reports');
   },
+  get dailyStats(): Collection<DailyStatDoc> {
+    return getDb().collection<DailyStatDoc>('dailyStats');
+  },
+  get dailyActive(): Collection<DailyActiveDoc> {
+    return getDb().collection<DailyActiveDoc>('dailyActive');
+  },
 };
+
+// สร้าง index แบบ self-heal: ถ้า index ชื่อเดิมมีอยู่แต่ options ไม่ตรง (เช่นเคย unique/TTL คนละค่า)
+// mongo จะโยน conflict — จับแล้ว drop สร้างใหม่แทน *ห้ามปล่อยให้ล้ม startup ทั้งแอป*
+// (จำเป็นจริง: prod เคย deploy feedbacks.userId แบบ unique ไปแล้ว โค้ดปัจจุบันเปลี่ยนเป็นไม่ unique)
+async function ensureIndexSafe(
+  col: Collection<any>,
+  keys: Record<string, 1 | -1>,
+  options?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await col.createIndex(keys as any, options as any);
+  } catch (err) {
+    const code = (err as { codeName?: string }).codeName;
+    if (code === 'IndexOptionsConflict' || code === 'IndexKeySpecsConflict') {
+      const name = Object.entries(keys).map(([k, v]) => `${k}_${v}`).join('_');
+      await col.dropIndex(name);
+      await col.createIndex(keys as any, options as any);
+      console.log(`[mongo] สร้าง index ${col.collectionName}.${name} ใหม่ (options เปลี่ยนจากของเดิม)`);
+    } else {
+      throw err;
+    }
+  }
+}
 
 // สร้าง index ที่จำเป็น (idempotent — เรียกซ้ำได้)
 export async function ensureIndexes(): Promise<void> {
@@ -72,11 +112,15 @@ export async function ensureIndexes(): Promise<void> {
     collections.movies.createIndex({ status: 1, title: 1 }), // รองรับ sort=title ไม่ให้ทำ in-memory SORT
     collections.movies.createIndex({ genres: 1 }),
     // feedbacks: query ตาม user + เรียงดูตามเวลา (ส่งซ้ำได้ไม่จำกัด — ไม่ unique)
-    collections.feedbacks.createIndex({ userId: 1 }),
+    // *ต้อง safe*: prod เคยมี index นี้แบบ unique (deploy รอบก่อน) — ชนแล้วต้อง drop สร้างใหม่ ไม่ใช่ล้ม
+    ensureIndexSafe(collections.feedbacks, { userId: 1 }),
     collections.feedbacks.createIndex({ createdAt: -1 }),
     // reports: admin ดูตาม status (open ก่อน) + เรียงตามเวลา
     collections.reports.createIndex({ status: 1, createdAt: -1 }),
     // users: หน้า follow-up ของ admin query ช่วง accessExpiresAt (ใกล้หมด/เพิ่งหมด)
     collections.users.createIndex({ accessExpiresAt: 1 }),
+    // dailyActive: marker กันนับ DAU ซ้ำ — TTL ลบเองหลัง 90 วัน (ใช้แค่กันซ้ำ ไม่ใช่ข้อมูลถาวร)
+    // safe: ถ้าวันหน้าปรับค่า TTL จะชนของเดิม — drop สร้างใหม่แทนล้ม startup
+    ensureIndexSafe(collections.dailyActive, { createdAt: 1 }, { expireAfterSeconds: 90 * 86_400 }),
   ]);
 }
