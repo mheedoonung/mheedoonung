@@ -68,7 +68,12 @@ export function MovieDetailPage() {
         <div style={{ ...styles.hero, backgroundImage: `url(${movie.backdropUrl})` }} />
       )}
 
-      <div style={styles.body}>
+      <div
+        style={{
+          ...styles.body,
+          paddingTop: movie.backdropUrl ? 24 : 'calc(env(safe-area-inset-top, 0px) + 24px)',
+        }}
+      >
         <div style={styles.topbar}>
           <Link to="/" style={styles.back}>
             ← กลับ

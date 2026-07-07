@@ -362,6 +362,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 20px',
+    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
     background: '#fff',
     borderBottom: '1px solid #eee',
     flexWrap: 'wrap' as const,
