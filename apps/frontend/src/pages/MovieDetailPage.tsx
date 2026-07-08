@@ -97,7 +97,9 @@ export function MovieDetailPage() {
             <button
               type="button"
               style={styles.playBtn}
-              onClick={() => navigate(`/watch/${encodeURIComponent(movie.slug)}`)}
+              // replace: หน้าดูหนังเขียนทับ detail ใน history -> กดกลับจากหนังถึงหน้ารายการเลย
+              // (ไม่ต้องผ่าน detail ซ้ำ — detail กลับเข้ามาได้จากการ์ดหน้ารายการอยู่แล้ว)
+              onClick={() => navigate(`/watch/${encodeURIComponent(movie.slug)}`, { replace: true })}
             >
               ▶ เล่น
             </button>

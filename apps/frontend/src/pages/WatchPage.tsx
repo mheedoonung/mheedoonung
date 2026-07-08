@@ -286,7 +286,8 @@ export function WatchPage() {
   // นับถึง 0 -> เล่นเรื่องแรกของรายการแนะนำ (slug เปลี่ยน -> effect [slug] เริ่มเรื่องใหม่เอง)
   useEffect(() => {
     if (countdown === 0 && suggestions[0]) {
-      navigate(`/watch/${encodeURIComponent(suggestions[0].slug)}`);
+      // replace: ดูต่อเนื่องกี่เรื่อง history ก็มีหนังแค่ตัวเดียว -> กดกลับถึงหน้ารายการเสมอ
+      navigate(`/watch/${encodeURIComponent(suggestions[0].slug)}`, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown]);
@@ -408,7 +409,7 @@ export function WatchPage() {
                       key={m.slug}
                       type="button"
                       style={i === 0 && countdown !== null ? styles.suggestCardNext : styles.suggestCard}
-                      onClick={() => navigate(`/watch/${encodeURIComponent(m.slug)}`)}
+                      onClick={() => navigate(`/watch/${encodeURIComponent(m.slug)}`, { replace: true })}
                     >
                       <img src={m.posterUrl} alt={m.title} style={styles.suggestPoster} loading="lazy" />
                       <span style={styles.suggestTitle}>{m.title}</span>
