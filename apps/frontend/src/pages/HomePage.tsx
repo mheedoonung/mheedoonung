@@ -2,7 +2,7 @@
 // - แสดงข้อความต้อนรับ + วันหมดอายุสิทธิ์
 // - ดึง /movies (MovieListResponse) มาแสดงเป็น grid โปสเตอร์ (player เป็นเฟสถัดไป)
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   PublicMovie,
   MovieListResponse,
@@ -65,16 +65,33 @@ export function HomePage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [movies, setMovies] = useState<PublicMovie[]>([]);
-  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loadingMovies, setLoadingMovies] = useState(true);
   const [moviesError, setMoviesError] = useState<string | null>(null);
 
-  // ตัวกรอง: คำค้น (q = ค่าที่พิมพ์, qApplied = ค่าหลัง debounce ที่ใช้ยิง API), genre, sort
-  const [q, setQ] = useState('');
-  const [qApplied, setQApplied] = useState('');
-  const [genre, setGenre] = useState('');
-  const [sort, setSort] = useState<MovieSort>('newest');
+  // ตัวกรอง + หน้า: source of truth อยู่ที่ URL query string (?page&q&genre&sort)
+  // -> back จากหน้าดูหนังกลับมาได้หน้า/ตัวกรองเดิม, refresh ไม่หาย, แชร์ลิงก์ได้
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  const qApplied = searchParams.get('q') ?? '';
+  const genre = searchParams.get('genre') ?? '';
+  const rawSort = searchParams.get('sort');
+  const sort: MovieSort =
+    rawSort === 'popular' || rawSort === 'title' ? rawSort : 'newest';
+  // q = ค่าที่กำลังพิมพ์ (local state — debounce แล้วค่อยลง URL เป็น qApplied)
+  const [q, setQ] = useState(qApplied);
+
+  // เขียนค่าลง URL — ใส่เฉพาะค่าที่ต่างจาก default (หน้า 1/sort newest ไม่ต้องรก URL)
+  // replace:true = ไม่สะสม history ทุกครั้งที่เปลี่ยนหน้า/กรอง (กด back ครั้งเดียวออกจาก Home ตามคาด)
+  const updateParams = (next: Partial<{ page: number; q: string; genre: string; sort: MovieSort }>): void => {
+    const merged = { page, q: qApplied, genre, sort, ...next };
+    const p = new URLSearchParams();
+    if (merged.page > 1) p.set('page', String(merged.page));
+    if (merged.q) p.set('q', merged.q);
+    if (merged.genre) p.set('genre', merged.genre);
+    if (merged.sort !== 'newest') p.set('sort', merged.sort);
+    setSearchParams(p, { replace: true });
+  };
   const [genres, setGenres] = useState<string[]>([]);
   const [hotIds, setHotIds] = useState<Set<string>>(new Set());
   const [redeemOpen, setRedeemOpen] = useState(false);
@@ -148,14 +165,20 @@ export function HomePage() {
     };
   }, []);
 
-  // debounce คำค้น 400ms -> qApplied + กลับไปหน้า 1 (กันยิง API ทุกตัวอักษร)
+  // debounce คำค้น 400ms -> ลง URL (q) + กลับไปหน้า 1 (กันยิง API/เขียน URL ทุกตัวอักษร)
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setQApplied(q.trim());
-      setPage(1);
+      if (q.trim() !== qApplied) updateParams({ q: q.trim(), page: 1 });
     }, 400);
     return () => window.clearTimeout(id);
-  }, [q]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, qApplied]);
+
+  // URL เปลี่ยนจากปุ่ม back/forward -> sync ค่าในช่องค้นหาให้ตรง
+  // (ตอนพิมพ์ปกติไม่สะเทือน: qApplied ตามทัน q อยู่แล้วหลัง debounce = setQ ค่าเดิม no-op)
+  useEffect(() => {
+    setQ(qApplied);
+  }, [qApplied]);
 
   // ดึงรายการหนังเมื่อเปลี่ยนหน้า/ตัวกรอง
   useEffect(() => {
@@ -189,27 +212,22 @@ export function HomePage() {
 
   // เปลี่ยน genre/sort แล้ว reset กลับหน้า 1 เสมอ
   const onGenreChange = (value: string): void => {
-    setGenre(value);
-    setPage(1);
+    updateParams({ genre: value, page: 1 });
   };
   const onSortChange = (value: MovieSort): void => {
-    setSort(value);
-    setPage(1);
+    updateParams({ sort: value, page: 1 });
   };
-  // ล้างตัวกรองทั้งหมดกลับค่าเริ่มต้น
+  // ล้างตัวกรองทั้งหมดกลับค่าเริ่มต้น (URL เกลี้ยง)
   const clearFilters = (): void => {
     setQ('');
-    setQApplied('');
-    setGenre('');
-    setSort('newest');
-    setPage(1);
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
 
   // เปลี่ยนหน้า + เลื่อนขึ้นบนสุด (clamp กันค่าหลุดช่วง)
   const goToPage = (p: number): void => {
     const next = Math.min(Math.max(1, p), totalPages);
     if (next === page) return;
-    setPage(next);
+    updateParams({ page: next });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -232,7 +250,8 @@ export function HomePage() {
           </div>
         </div>
         <div className="mdn-home-actions">
-          <button type="button" onClick={() => setRedeemOpen(true)} style={styles.topupButton}>
+          {/* CTA หลัก — สไตล์+animation อยู่ใน index.css (.mdn-topup-btn) เพราะ keyframes ทำ inline ไม่ได้ */}
+          <button type="button" onClick={() => setRedeemOpen(true)} className="mdn-topup-btn">
             + เติมเวลา
           </button>
           <button type="button" onClick={() => setReportOpen(true)} style={styles.reportButton}>
@@ -402,19 +421,6 @@ const styles = {
   expiry: { color: '#666', fontSize: 14 },
   // ใกล้หมด (<1 วัน) -> แดงตัวหนา
   expiryWarn: { color: '#dc2626', fontSize: 14, fontWeight: 700 as const },
-  // ปุ่ม CTA หลัก — gradient + เงา ให้เด่น
-  topupButton: {
-    padding: '9px 18px',
-    background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 999,
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
-    boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
-  },
   // แจ้งปัญหา — ปุ่มรอง outline กลางๆ ไม่แย่งเด่น
   reportButton: {
     padding: '9px 14px',

@@ -24,6 +24,60 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* ปุ่มเติมเวลา (CTA หลัก) — gradient ไหลช้า + แสงกวาดผ่านเป็นจังหวะ
+   จูนให้ "ชวนกด" แต่ไม่รก: gradient ขยับรอบละ 8 วิ, แสงกวาด ~0.7 วิ แล้วพักจนครบ 4 วิ
+   (ไม่ใช่กะพริบตลอดเวลา) + ปิด animation ให้คนที่ตั้งค่า reduce motion */
+.mdn-topup-btn {
+  position: relative;
+  overflow: hidden;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  background: linear-gradient(120deg, #2563eb, #7c3aed, #d946ef, #4f46e5, #2563eb);
+  background-size: 300% 100%;
+  animation: mdn-topup-pan 8s ease-in-out infinite;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.mdn-topup-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.55);
+}
+.mdn-topup-btn:active {
+  transform: translateY(0);
+}
+/* แถบแสงเฉียงกวาดจากซ้ายไปขวา (วิบวับ) — โผล่แค่ช่วงสั้น ๆ ของรอบ ไม่กวนสายตา */
+.mdn-topup-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  left: -60%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-20deg);
+  animation: mdn-topup-shine 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes mdn-topup-pan {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes mdn-topup-shine {
+  0% { left: -60%; }
+  18% { left: 130%; }
+  100% { left: 130%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdn-topup-btn { animation: none; }
+  .mdn-topup-btn::after { animation: none; display: none; }
+}
+
 /* ปุ่ม header หน้าหลัก (เติมเวลา / ออกจากระบบ)
    จอเล็ก: กินเต็มแถว แล้วดันสองปุ่มไปคนละฝั่ง (space-between) ไม่ให้ชิดกัน */
 .mdn-home-actions {
