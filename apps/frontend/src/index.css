@@ -78,6 +78,25 @@ button:disabled {
   .mdn-topup-btn::after { animation: none; display: none; }
 }
 
+/* กริดหนังแนะนำบน end screen (หน้าดูหนังจบ)
+   มือถือ: บังคับ 3 คอลัมน์ (การ์ดย่อตามจอ) -> 6 เรื่อง = 2 แถว ไม่ล้นแนวตั้ง
+   จอกว้าง: การ์ดคงที่ 130px จัดกลาง
+   หมายเหตุ: repeat(auto-fit, minmax(min,130px)) ใช้ไม่ได้ — สเปกนับจำนวนคอลัมน์จากค่า max
+   ทำให้จอแคบได้ 2 คอลัมน์เสมอ (การ์ดใหญ่ ล้นจอแนว y) เลยต้องแยก media query */
+.mdn-suggest-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 860px;
+  justify-content: center;
+}
+@media (min-width: 640px) {
+  .mdn-suggest-grid {
+    grid-template-columns: repeat(auto-fit, 130px);
+  }
+}
+
 /* ปุ่ม header หน้าหลัก (เติมเวลา / ออกจากระบบ)
    จอเล็ก: กินเต็มแถว แล้วดันสองปุ่มไปคนละฝั่ง (space-between) ไม่ให้ชิดกัน */
 .mdn-home-actions {

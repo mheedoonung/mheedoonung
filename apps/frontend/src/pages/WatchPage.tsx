@@ -14,6 +14,7 @@ import '@vidstack/react/player/styles/default/layouts/video.css';
 import type { PlaybackTokens, PublicMovie, MovieListResponse } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 import { addWatchSeconds } from '../lib/feedbackGate';
+import { pickSuggestions, markWatched, recentWatched } from '../lib/suggest';
 import { ReportModal } from '../components/ReportModal';
 
 // end screen: จำนวนเรื่องแนะนำ + วินาทีนับถอยหลังก่อน autoplay เรื่องแรก
@@ -152,25 +153,29 @@ export function WatchPage() {
     setShowUnmute(false);
   }
 
-  // โหลดเรื่องแนะนำสำหรับ end screen: แนวเดียวกับเรื่องที่เพิ่งจบ (popular ก่อน)
-  // ไม่พอค่อยเติมจาก popular รวม — ใช้ API เดิมทั้งหมด ไม่มี endpoint ใหม่
+  // โหลดเรื่องแนะนำสำหรับ end screen — ดึง candidate หลายมุม (แนวเดียวกัน 2 แนวแรก +
+  // ยอดนิยม + มาใหม่) แล้วให้ lib/suggest คัด: ตัดเรื่องที่เพิ่งดู + สุ่ม + แนวเดียวกันนำ
+  // (แก้ปัญหา "แนะนำแต่เรื่องเดิม" — เดิมดึง popular อย่างเดียวซึ่ง ranking นิ่ง)
   async function loadSuggestions(): Promise<void> {
     try {
-      const collect = new Map<string, PublicMovie>();
       const current = await api.get<PublicMovie>(`/movies/${encodeURIComponent(slug)}`);
-      const genre = current.genres[0];
-      if (genre) {
-        const byGenre = await api.get<MovieListResponse>(
-          `/movies?genre=${encodeURIComponent(genre)}&sort=popular&limit=12`,
-        );
-        for (const m of byGenre.items) if (m.slug !== slug) collect.set(m.slug, m);
-      }
-      if (collect.size < SUGGEST_COUNT) {
-        const popular = await api.get<MovieListResponse>('/movies?sort=popular&limit=12');
-        for (const m of popular.items) if (m.slug !== slug) collect.set(m.slug, m);
-      }
+      const queries = [
+        ...current.genres
+          .slice(0, 2)
+          .map((g) => `/movies?genre=${encodeURIComponent(g)}&sort=popular&limit=12`),
+        '/movies?sort=popular&limit=12',
+        '/movies?sort=newest&limit=12',
+      ];
+      // ยิงขนาน — ตัวไหนพังข้ามตัวนั้น (แนะนำจากเท่าที่ได้)
+      const results = await Promise.all(
+        queries.map((q) => api.get<MovieListResponse>(q).catch(() => null)),
+      );
+      const collect = new Map<string, PublicMovie>();
+      for (const r of results) if (r) for (const m of r.items) collect.set(m.slug, m);
       if (!aliveRef.current) return;
-      setSuggestions([...collect.values()].slice(0, SUGGEST_COUNT));
+      setSuggestions(
+        pickSuggestions([...collect.values()], slug, current.genres, recentWatched(), SUGGEST_COUNT),
+      );
     } catch {
       // เงียบ — end screen ไม่มีเรื่องแนะนำก็ยังมีปุ่มดูอีกครั้ง/กลับหน้าแรก
     }
@@ -217,6 +222,8 @@ export function WatchPage() {
       }
       setFileUrl(tok.fileUrl);
       setPhase('playing');
+      // จำว่าดูเรื่องนี้แล้ว — end screen จะได้ไม่แนะนำเรื่องที่เพิ่งดูวนกลับมา
+      markWatched(slug);
       // โหลดซับ (ถ้ามี) — cookie ถูกตั้งจาก primeCookie แล้ว ใช้ grant เดียวกันดึงได้
       if (tok.subtitleUrl) void loadSubtitle(tok.subtitleUrl);
       scheduleRefresh(tok.refreshInSeconds);
@@ -392,7 +399,8 @@ export function WatchPage() {
                     'เรื่องถัดไปที่น่าจะชอบ'
                   )}
                 </p>
-                <div style={styles.suggestGrid}>
+                {/* layout กริดอยู่ใน index.css (.mdn-suggest-grid) — ต้องใช้ media query */}
+                <div className="mdn-suggest-grid">
                   {suggestions.map((m, i) => (
                     <button
                       key={m.slug}
@@ -530,7 +538,9 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
-    justifyContent: 'center',
+    // *ห้าม* justifyContent:'center' — เนื้อหาสูงกว่าจอ (มือถือ) จะตัดหัวแบบเลื่อนขึ้นไปไม่ถึง
+    // ชิดบนแล้วปล่อยให้ scroll ลงแทน (padding บนเผื่อ navbar แล้ว)
+    justifyContent: 'flex-start',
     gap: 14,
     padding: 'calc(env(safe-area-inset-top, 0px) + 60px) 20px 24px',
     overflowY: 'auto' as const,
@@ -546,14 +556,7 @@ const styles = {
     fontSize: 13,
     cursor: 'pointer',
   },
-  suggestGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 130px))',
-    justifyContent: 'center',
-    gap: 12,
-    width: '100%',
-    maxWidth: 860,
-  },
+  // layout ของกริดย้ายไป index.css (.mdn-suggest-grid) — ต้องใช้ media query แยกมือถือ/จอกว้าง
   suggestCard: {
     background: 'transparent',
     border: '2px solid transparent',
@@ -578,7 +581,16 @@ const styles = {
     color: '#fff',
   },
   suggestPoster: { width: '100%', aspectRatio: '2 / 3', objectFit: 'cover' as const, borderRadius: 6, display: 'block', background: '#222' },
-  suggestTitle: { fontSize: 13, lineHeight: 1.3, textAlign: 'center' as const },
+  // ชื่อเรื่องไทยยาว — จำกัด 2 บรรทัดกันการ์ดสูงไม่เท่ากัน/ดันจอ
+  suggestTitle: {
+    fontSize: 12,
+    lineHeight: 1.3,
+    textAlign: 'center' as const,
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical' as const,
+    overflow: 'hidden' as const,
+  },
   endActions: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 },
   endHomeLink: { color: '#bbb', textDecoration: 'none', fontSize: 15 },
   unmuteBtn: {
