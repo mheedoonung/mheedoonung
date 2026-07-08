@@ -14,6 +14,7 @@ import '@vidstack/react/player/styles/default/layouts/video.css';
 import type { PlaybackTokens, PublicMovie, MovieListResponse } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 import { addWatchSeconds } from '../lib/feedbackGate';
+import { goBack } from '../lib/nav';
 import { pickSuggestions, markWatched, recentWatched } from '../lib/suggest';
 import { ReportModal } from '../components/ReportModal';
 
@@ -295,9 +296,10 @@ export function WatchPage() {
       {/* navbar ลอยทับวิดีโอ (fixed + พื้นหลังโปร่งใส) -> วิดีโอเต็มจอด้านหลัง
           pointerEvents:none ที่ตัว bar เพื่อให้แตะทะลุไปโดน control ของ player ได้; เปิด auto เฉพาะปุ่ม/โลโก้ */}
       <div style={styles.bar}>
-        <Link to="/" style={styles.back}>
+        {/* ย้อน history จริง — คง ?page/ตัวกรองของหน้ารายการ (Link to="/" ทำ state หาย) */}
+        <button type="button" style={styles.back} onClick={() => goBack(navigate)}>
           ← กลับ
-        </Link>
+        </button>
         <div style={styles.barRight}>
           <button type="button" style={styles.reportBtn} onClick={() => setReportOpen(true)}>
             ⚠️ แจ้งปัญหา
@@ -481,7 +483,18 @@ const styles = {
     pointerEvents: 'none' as const,
   },
   // back/logo/ปุ่มแจ้งปัญหา รับ tap เอง (bar เป็น none) + drop shadow ให้อ่านออกบนวิดีโอสว่าง
-  back: { color: '#fff', textDecoration: 'none', fontSize: 15, pointerEvents: 'auto' as const, textShadow: '0 1px 3px rgba(0,0,0,0.8)' },
+  // back เป็น <button> (ย้อน history) — เคลียร์ style ปุ่มให้เหมือนลิงก์เดิม
+  back: {
+    color: '#fff',
+    textDecoration: 'none',
+    fontSize: 15,
+    pointerEvents: 'auto' as const,
+    textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+  },
   barRight: { display: 'flex', alignItems: 'center', gap: 12 },
   reportBtn: {
     pointerEvents: 'auto' as const,

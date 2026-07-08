@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { PublicMovie } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
+import { goBack } from '../lib/nav';
 
 type Status = 'loading' | 'ready' | 'notfound' | 'error';
 
@@ -75,9 +76,10 @@ export function MovieDetailPage() {
         }}
       >
         <div style={styles.topbar}>
-          <Link to="/" style={styles.back}>
+          {/* ย้อน history จริง — คง ?page/ตัวกรองของหน้ารายการ (Link to="/" ทำ state หาย) */}
+          <button type="button" style={styles.back} onClick={() => goBack(navigate)}>
             ← กลับ
-          </Link>
+          </button>
           <img src="/mheedoonung.png" alt="หมีดูหนัง" style={styles.brand} />
         </div>
 
@@ -130,7 +132,17 @@ const styles = {
   },
   body: { maxWidth: 860, margin: '0 auto', padding: 24 },
   topbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  back: { display: 'inline-block', color: '#555', textDecoration: 'none' },
+  // เป็น <button> แล้ว (ย้อน history) — เคลียร์ style ปุ่มให้หน้าตาเหมือนลิงก์เดิม
+  back: {
+    display: 'inline-block',
+    color: '#555',
+    textDecoration: 'none',
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    fontSize: 15,
+    cursor: 'pointer',
+  },
   brand: { width: 40, height: 40, objectFit: 'contain' as const, borderRadius: 8 },
   head: { display: 'flex', gap: 20, flexWrap: 'wrap' as const },
   poster: { width: 180, aspectRatio: '2 / 3', objectFit: 'cover' as const, borderRadius: 10, background: '#eee' },
