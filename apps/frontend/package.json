@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "export VITE_API_URL=http://localhost:3000 && vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "deploy": "bun run build && bunx wrangler pages deploy dist --project-name mheedoonung --branch main --commit-dirty=true"
