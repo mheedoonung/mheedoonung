@@ -15,6 +15,7 @@ import { RedeemModal } from '../components/RedeemModal';
 import { ExpiryWarningModal } from '../components/ExpiryWarningModal';
 import { FeedbackModal } from '../components/FeedbackModal';
 import { ReportModal } from '../components/ReportModal';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { shouldAskFeedback } from '../lib/feedbackGate';
 
 // เกณฑ์ "ใกล้หมด" = เหลือน้อยกว่า 1 วัน
@@ -98,6 +99,7 @@ export function HomePage() {
   const [expiryWarnOpen, setExpiryWarnOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   // เด้ง feedback ได้ครั้งเดียวต่อการเข้าหน้านี้ (server คุมความถี่ระยะยาวผ่าน shouldAskFeedback)
   const feedbackShownRef = useRef(false);
 
@@ -257,6 +259,12 @@ export function HomePage() {
           <button type="button" onClick={() => setReportOpen(true)} style={styles.reportButton}>
             แจ้งปัญหา
           </button>
+          {/* เฉพาะ user สมัครมือ (ไม่มี LINE) — user ผ่าน LINE ไม่มี password ให้เปลี่ยน */}
+          {user?.authMethod === 'manual' && (
+            <button type="button" onClick={() => setChangePasswordOpen(true)} style={styles.reportButton}>
+              เปลี่ยนรหัสผ่าน
+            </button>
+          )}
           <button type="button" onClick={handleLogout} style={styles.logoutButton}>
             ออกจากระบบ
           </button>
@@ -266,6 +274,7 @@ export function HomePage() {
       <RedeemModal open={redeemOpen} onClose={() => setRedeemOpen(false)} />
       <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <ReportModal open={reportOpen} onClose={() => setReportOpen(false)} />
+      <ChangePasswordModal open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
       <ExpiryWarningModal
         open={expiryWarnOpen}
         expiresText={formatExpiry(user?.accessExpiresAt ?? null)}

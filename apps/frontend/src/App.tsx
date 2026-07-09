@@ -21,6 +21,7 @@ import { AdminFeedbackPage } from './pages/AdminFeedbackPage';
 import { AdminReportsPage } from './pages/AdminReportsPage';
 import { AdminFollowupPage } from './pages/AdminFollowupPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { AdminManualUsersPage } from './pages/AdminManualUsersPage';
 
 export function App() {
   return (
@@ -28,7 +29,9 @@ export function App() {
       {/* ปุ่มติดตั้ง PWA — โชว์ลอยทุกหน้า (ซ่อนเองถ้าติดตั้งแล้ว/เบราว์เซอร์ไม่รองรับ) */}
       <InstallPrompt />
       <Routes>
-        {/* หน้าเข้าสู่ระบบผู้ใช้ */}
+        {/* หน้าเข้าสู่ระบบผู้ใช้ — มีทั้ง LINE (ปุ่มหลัก) และ username/password (toggle ซ่อนไว้ สำหรับลูกค้าไม่มี LINE)
+            รวมเป็นหน้าเดียว เพราะ ProtectedRoute redirect ไป /login คงที่เสมอตอน session หมด — แยกหน้าจะทำให้
+            ลูกค้าที่ไม่มี LINE หลุด session แล้วเข้าไม่ได้อีก (ไม่รู้ path ลับ) */}
         <Route path="/login" element={<LoginPage />} />
 
         {/* หน้าเติมบัตร — ต้อง login (แต่ยังไม่ต้อง active) */}
@@ -75,6 +78,7 @@ export function App() {
         <Route path="/admin" element={<AdminLoginPage />} />
         <Route element={<AdminLayout />}>
           <Route path="/admin/cards" element={<AdminCardsPage />} />
+          <Route path="/admin/manual-users" element={<AdminManualUsersPage />} />
           <Route path="/admin/feedback" element={<AdminFeedbackPage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
           <Route path="/admin/followup" element={<AdminFollowupPage />} />

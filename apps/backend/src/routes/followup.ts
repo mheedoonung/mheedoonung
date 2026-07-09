@@ -17,6 +17,7 @@ function toItem(u: User & { _id?: unknown }): FollowupUserItem {
     displayName: u.displayName,
     pictureUrl: u.pictureUrl,
     lineUserId: u.lineUserId,
+    authMethod: u.authMethod,
     accessExpiresAt: u.accessExpiresAt!,
     createdAt: u.createdAt,
   };

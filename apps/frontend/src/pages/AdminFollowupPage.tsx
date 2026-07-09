@@ -80,9 +80,13 @@ export function AdminFollowupPage() {
               <div style={styles.metaSub}>เป็นลูกค้าตั้งแต่ {formatDate(u.createdAt)}</div>
             </div>
           </div>
-          <button type="button" style={styles.copyBtn} onClick={() => void copyLineId(u)}>
-            {copiedId === u.id ? '✓ คัดลอกแล้ว' : 'คัดลอก LINE ID'}
-          </button>
+          {u.authMethod === 'manual' ? (
+            <span style={styles.muted}>สมัครมือ (ไม่มี LINE)</span>
+          ) : (
+            <button type="button" style={styles.copyBtn} onClick={() => void copyLineId(u)}>
+              {copiedId === u.id ? '✓ คัดลอกแล้ว' : 'คัดลอก LINE ID'}
+            </button>
+          )}
         </article>
       ))}
     </div>

@@ -28,6 +28,8 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   // (DEV เท่านั้น) เข้าระบบโดยไม่ผ่าน LINE — backend จะ 404 ถ้าไม่ได้เปิด DEV_LOGIN_ENABLED
   devLogin: (lineUserId?: string, displayName?: string) => Promise<void>;
+  // เข้าระบบด้วย username/password ที่ admin สร้างให้ (ลูกค้าไม่มี LINE) — คนละ path กับ login หลัก
+  manualLogin: (username: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -105,9 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (res.user) setUser(res.user);
   }, []);
 
+  // เข้าระบบด้วย username/password (user สมัครมือ) ผ่าน /auth/manual-login
+  const manualLogin = useCallback(async (username: string, password: string): Promise<void> => {
+    const res = await api.post<MeResponse>('/auth/manual-login', { username, password });
+    if (res.user) setUser(res.user);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, refresh, devLogin }),
-    [user, loading, login, logout, refresh, devLogin],
+    () => ({ user, loading, login, logout, refresh, devLogin, manualLogin }),
+    [user, loading, login, logout, refresh, devLogin, manualLogin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

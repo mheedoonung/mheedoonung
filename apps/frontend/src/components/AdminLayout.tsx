@@ -58,6 +58,9 @@ export function AdminLayout() {
           <NavLink to="/admin/cards" style={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}>
             จัดการบัตร
           </NavLink>
+          <NavLink to="/admin/manual-users" style={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}>
+            ผู้ใช้ (ไม่มี LINE)
+          </NavLink>
           <NavLink to="/admin/feedback" style={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}>
             Feedback
           </NavLink>

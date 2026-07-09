@@ -1,13 +1,18 @@
 export type CardStatus = 'unused' | 'redeemed' | 'revoked';
 export interface User {
   _id?: string;
-  lineUserId: string;
+  lineUserId: string;   // user สมัครมือ (authMethod:'manual') ใช้ค่า synthetic "manual:<username>" — ห้าม parse prefix นี้ที่อื่น เช็ค authMethod แทน
   displayName: string;
   pictureUrl?: string;
   accessExpiresAt: string | null;   // ISO; null = ยังไม่เคย active
   currentStream?: { streamId: string; movieId: string; ip: string; startedAt: string; heartbeatAt: string } | null;
   createdAt: string;
   updatedAt: string;
+  // ---- user สมัครมือโดย admin (ลูกค้าไม่มี LINE) — ไม่มี field นี้ = user ปกติผ่าน LINE ----
+  authMethod?: 'manual';
+  username?: string;      // unique (sparse index) เฉพาะ authMethod:'manual'
+  passwordHash?: string;  // argon2id ผ่าน lib/crypto hashPassword — เฉพาะ authMethod:'manual'
+  note?: string;          // remark ของ admin เช่น "จาก Facebook: ชื่อ..." — ไว้เทียบกลับว่า user มาจากช่องทางไหน (เฉพาะ manual)
 }
 export interface Card {
   _id?: string; code: string; days: number; status: CardStatus; note?: string;
@@ -15,6 +20,21 @@ export interface Card {
   createdBy: string; createdAt: string;
 }
 export interface Admin { _id?: string; username: string; passwordHash: string; createdAt: string }
+
+// ---- Login มือ (admin สร้างให้ลูกค้าที่ไม่มี LINE) ----
+export interface ManualLoginBody { username: string; password: string }
+export interface ChangePasswordBody { oldPassword: string; newPassword: string }
+export interface AdminSetPasswordBody { newPassword: string }
+export interface CreateManualUserBody { username: string; password: string; displayName: string; note?: string }
+export interface ManualUserListItem {
+  id: string;
+  username: string;
+  displayName: string;
+  note?: string;          // ไว้เทียบกลับว่าลูกค้ามาจากช่องทางไหน (เช่น "FB: ชื่อบัญชี")
+  accessExpiresAt: string | null;
+  createdAt: string;
+}
+export interface ManualUserListResponse { items: ManualUserListItem[] }
 
 // ---- หนัง (เต็มเรื่อง 1 ไฟล์/เรื่องบน R2) ----
 export type MovieStatus = 'draft' | 'published';
@@ -54,7 +74,7 @@ export interface Movie {
   createdAt: string;
   updatedAt: string;
 }
-export interface PublicUser { lineUserId: string; displayName: string; pictureUrl?: string; accessExpiresAt: string | null; isActive: boolean }
+export interface PublicUser { lineUserId: string; displayName: string; pictureUrl?: string; accessExpiresAt: string | null; isActive: boolean; authMethod?: 'manual' }
 export interface MeResponse { user: PublicUser | null }
 export interface LineLoginBody { idToken: string }
 export interface RedeemBody { code: string }
@@ -189,6 +209,7 @@ export interface FollowupUserItem {
   displayName: string;
   pictureUrl?: string;
   lineUserId: string;         // ไว้ค้นหา/ทักใน LINE OA
+  authMethod?: 'manual';      // มี = user สมัครมือ ไม่มี LINE จริง ห้ามใช้ lineUserId ทักใน OA
   accessExpiresAt: string;    // ISO
   createdAt: string;          // ไว้ดูว่าเป็นลูกค้ามานานแค่ไหน
 }

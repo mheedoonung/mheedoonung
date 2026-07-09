@@ -134,5 +134,6 @@ export function toPublicUser(user: User): PublicUser {
     pictureUrl: user.pictureUrl,
     accessExpiresAt: user.accessExpiresAt,
     isActive: isActive(user),
+    authMethod: user.authMethod,
   };
 }

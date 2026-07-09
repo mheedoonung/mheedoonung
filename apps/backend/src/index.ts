@@ -13,6 +13,7 @@ import { feedbackRoutes } from './routes/feedback';
 import { reportRoutes } from './routes/reports';
 import { followupRoutes } from './routes/followup';
 import { dashboardRoutes } from './routes/dashboard';
+import { manualUserRoutes } from './routes/manualUsers';
 
 // เชื่อมต่อ MongoDB ให้เสร็จก่อนเปิดรับ request (connectMongo จะเรียก ensureIndexes ให้ด้วย)
 // ทำเป็น top-level await ก่อน .listen() เพื่อกัน race ช่วง startup:
@@ -48,6 +49,7 @@ const app = new Elysia()
   .use(reportRoutes)
   .use(followupRoutes)
   .use(dashboardRoutes)
+  .use(manualUserRoutes)
   .listen(env.PORT);
 
 console.log(`[backend] กำลังรันที่ http://localhost:${env.PORT}`);

@@ -97,18 +97,19 @@ button:disabled {
   }
 }
 
-/* ปุ่ม header หน้าหลัก (เติมเวลา / ออกจากระบบ)
-   จอเล็ก: กินเต็มแถว แล้วดันสองปุ่มไปคนละฝั่ง (space-between) ไม่ให้ชิดกัน */
+/* ปุ่ม header หน้าหลัก (เติมเวลา / แจ้งปัญหา / เปลี่ยนรหัสผ่าน / ออกจากระบบ)
+   จอเล็ก: กินเต็มแถว + wrap ปุ่มที่ล้นไปบรรทัดถัดไป กัน overflow แนวนอนทั้งหน้า */
 .mdn-home-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
 }
 @media (max-width: 520px) {
   .mdn-home-actions {
     flex: 1 1 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 }
 

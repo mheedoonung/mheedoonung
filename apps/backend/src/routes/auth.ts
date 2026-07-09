@@ -2,8 +2,12 @@
 // รวมถึง /me และ /auth/logout — ใช้ sessionPlugin จัดการ session ของ user
 import { Elysia, t } from 'elysia';
 import { randomBytes } from 'node:crypto';
+import { ObjectId } from 'mongodb';
 import type { ApiError, MeResponse } from '@mheedoonung/shared';
 import { env } from '../config/env';
+import { collections } from '../db/mongo';
+import { hashPassword, verifyPassword } from '../lib/crypto';
+import { rateLimit } from '../lib/rateLimit';
 import { sessionPlugin, toPublicUser } from '../plugins/session';
 import {
   buildLineAuthorizeUrl,
@@ -112,6 +116,74 @@ export const authRoutes = new Elysia()
       // body ต้องมี idToken (LineLoginBody)
       body: t.Object({
         idToken: t.String({ minLength: 1 }),
+      }),
+    },
+  )
+
+  // ---- POST /auth/manual-login : เส้นทางแยกสำหรับลูกค้าที่ไม่มี LINE — admin สร้าง username/password ให้ (ดู POST /admin/manual-users) ----
+  .post(
+    '/auth/manual-login',
+    async ({ body, clientIp, set, setUserSession }) => {
+      // กัน brute-force รหัสผ่าน — 10 ครั้ง/5 นาที ต่อ IP (มาตรฐานเดียวกับ /admin/login)
+      if (!rateLimit(`manual-login:${clientIp}`, 10, 5 * 60_000)) {
+        set.status = 429;
+        return { error: 'too_many_requests', message: 'พยายามเข้าสู่ระบบบ่อยเกินไป ลองใหม่ภายหลัง' } satisfies ApiError;
+      }
+
+      const user = await collections.users.findOne({ username: body.username, authMethod: 'manual' });
+      // ไม่พบ user หรือรหัสผ่านผิด -> 401 เดียวกัน (ไม่บอกว่าผิดที่ช่องไหน)
+      if (!user || !user.passwordHash || !(await verifyPassword(body.password, user.passwordHash))) {
+        set.status = 401;
+        return { error: 'invalid_credentials' } satisfies ApiError;
+      }
+
+      await setUserSession(user._id.toHexString());
+      return { user: toPublicUser(user as any) } satisfies MeResponse;
+    },
+    {
+      body: t.Object({
+        username: t.String({ minLength: 1 }),
+        password: t.String({ minLength: 1 }),
+      }),
+    },
+  )
+
+  // ---- POST /auth/change-password : self-service เปลี่ยนรหัสผ่าน (เฉพาะ user สมัครมือ — authMethod:'manual') ----
+  .post(
+    '/auth/change-password',
+    async ({ body, currentUser, set }) => {
+      if (!currentUser) {
+        set.status = 401;
+        return { error: 'unauthorized' } satisfies ApiError;
+      }
+      // user ผ่าน LINE ไม่มี passwordHash — เปลี่ยนรหัสผ่านทางนี้ไม่ได้
+      if (currentUser.authMethod !== 'manual' || !currentUser.passwordHash) {
+        set.status = 400;
+        return { error: 'not_manual_user', message: 'เปลี่ยนรหัสผ่านได้เฉพาะบัญชีที่ไม่มี LINE' } satisfies ApiError;
+      }
+      // กัน brute-force เดารหัสผ่านเก่า — 10 ครั้ง/5 นาที ต่อ user (มี session แล้วแต่ยังต้องกัน)
+      if (!rateLimit(`change-password:${currentUser._id}`, 10, 5 * 60_000)) {
+        set.status = 429;
+        return { error: 'too_many_requests', message: 'พยายามบ่อยเกินไป ลองใหม่ภายหลัง' } satisfies ApiError;
+      }
+
+      const ok = await verifyPassword(body.oldPassword, currentUser.passwordHash);
+      if (!ok) {
+        set.status = 401;
+        return { error: 'invalid_credentials' } satisfies ApiError;
+      }
+
+      const passwordHash = await hashPassword(body.newPassword);
+      await collections.users.updateOne(
+        { _id: new ObjectId(currentUser._id) } as any,
+        { $set: { passwordHash, updatedAt: new Date().toISOString() } },
+      );
+      return { ok: true } as const;
+    },
+    {
+      body: t.Object({
+        oldPassword: t.String({ minLength: 1 }),
+        newPassword: t.String({ minLength: 6 }),
       }),
     },
   )

@@ -101,6 +101,8 @@ async function ensureIndexSafe(
 export async function ensureIndexes(): Promise<void> {
   await Promise.all([
     collections.users.createIndex({ lineUserId: 1 }, { unique: true }),
+    // username: เฉพาะ user สมัครมือ (authMethod:'manual') — sparse กันชน user LINE ปกติที่ไม่มี field นี้
+    collections.users.createIndex({ username: 1 }, { unique: true, sparse: true }),
     collections.cards.createIndex({ code: 1 }, { unique: true }),
     collections.cards.createIndex({ status: 1 }),
     collections.admins.createIndex({ username: 1 }, { unique: true }),
