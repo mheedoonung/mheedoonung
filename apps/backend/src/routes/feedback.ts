@@ -4,16 +4,21 @@
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import {
+  FEEDBACK_CAMPAIGN_VERSION,
+  FEEDBACK_REWARD_DAYS,
   FEEDBACK_TAGS,
   type ApiError,
   type FeedbackListResponse,
+  type FeedbackResponse,
   type FeedbackSummaryResponse,
 } from '@mheedoonung/shared';
-import { sessionPlugin } from '../plugins/session';
+import { isActive, sessionPlugin } from '../plugins/session';
 import { collections } from '../db/mongo';
 import { rateLimit } from '../lib/rateLimit';
+import { extendUserAccess } from '../lib/accessTime';
 
 const TAG_SET = new Set<string>(FEEDBACK_TAGS);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const feedbackRoutes = new Elysia()
   .use(sessionPlugin)
@@ -46,7 +51,26 @@ export const feedbackRoutes = new Elysia()
         watchSeconds,
         createdAt: now,
       });
-      return { ok: true };
+
+      // แถม +วัน ครั้งเดียวต่อแคมเปญ (feedbackRewardVersion) — filter เช็ค $ne แบบ atomic
+      // กันรับซ้ำตอนยิงพร้อมกันสองแท็บ (ดู lib/accessTime); ส่งซ้ำได้ไม่จำกัดแต่ได้รางวัลรอบเดียว/เวอร์ชัน
+      //
+      // จำกัดเฉพาะ user ที่ active อยู่แล้ว (เคยเติมบัตรจริง) — กันสมัคร LINE ใหม่ฟรี (ไม่เคยจ่ายเงิน/ดูอะไรเลย)
+      // ยิง POST นี้ตรง ๆ ครั้งเดียวแล้วได้วันฟรี ทำซ้ำได้ไม่จำกัดจำนวนบัญชี ถ้ายังไม่ active ตอนนี้ -> ไม่ stamp
+      // feedbackRewardVersion เลย เก็บสิทธิ์ไว้ให้ได้รางวัลตอนกลับมา active แล้วส่ง feedback อีกครั้ง
+      const accessExpiresAt = isActive(currentUser)
+        ? await extendUserAccess(
+            { _id: new ObjectId(currentUser._id!), feedbackRewardVersion: { $ne: FEEDBACK_CAMPAIGN_VERSION } },
+            FEEDBACK_REWARD_DAYS * DAY_MS,
+            { feedbackRewardVersion: FEEDBACK_CAMPAIGN_VERSION },
+          )
+        : null;
+
+      return {
+        ok: true,
+        rewardGranted: accessExpiresAt !== null,
+        ...(accessExpiresAt ? { accessExpiresAt } : {}),
+      } satisfies FeedbackResponse;
     },
     {
       body: t.Object({

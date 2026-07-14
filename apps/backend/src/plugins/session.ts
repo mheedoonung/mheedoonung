@@ -3,7 +3,7 @@
 import { Elysia } from 'elysia';
 import { jwt } from '@elysiajs/jwt';
 import { ObjectId } from 'mongodb';
-import type { User, Admin, PublicUser } from '@mheedoonung/shared';
+import { FEEDBACK_CAMPAIGN_VERSION, type User, type Admin, type PublicUser } from '@mheedoonung/shared';
 import { env } from '../config/env';
 import { collections } from '../db/mongo';
 
@@ -135,5 +135,6 @@ export function toPublicUser(user: User): PublicUser {
     accessExpiresAt: user.accessExpiresAt,
     isActive: isActive(user),
     authMethod: user.authMethod,
+    feedbackRewardClaimed: user.feedbackRewardVersion === FEEDBACK_CAMPAIGN_VERSION,
   };
 }

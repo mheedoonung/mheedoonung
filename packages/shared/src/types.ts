@@ -13,6 +13,7 @@ export interface User {
   username?: string;      // unique (sparse index) เฉพาะ authMethod:'manual'
   passwordHash?: string;  // argon2id ผ่าน lib/crypto hashPassword — เฉพาะ authMethod:'manual'
   note?: string;          // remark ของ admin เช่น "จาก Facebook: ชื่อ..." — ไว้เทียบกลับว่า user มาจากช่องทางไหน (เฉพาะ manual)
+  feedbackRewardVersion?: string; // แคมเปญ feedback เวอร์ชันล่าสุดที่ user นี้เคยรับรางวัล +วันไปแล้ว (กันรับซ้ำ ดู FEEDBACK_CAMPAIGN_VERSION)
 }
 export interface Card {
   _id?: string; code: string; days: number; status: CardStatus; note?: string;
@@ -74,7 +75,15 @@ export interface Movie {
   createdAt: string;
   updatedAt: string;
 }
-export interface PublicUser { lineUserId: string; displayName: string; pictureUrl?: string; accessExpiresAt: string | null; isActive: boolean; authMethod?: 'manual' }
+export interface PublicUser {
+  lineUserId: string;
+  displayName: string;
+  pictureUrl?: string;
+  accessExpiresAt: string | null;
+  isActive: boolean;
+  authMethod?: 'manual';
+  feedbackRewardClaimed: boolean; // true = รับรางวัล feedback ของแคมเปญปัจจุบัน (FEEDBACK_CAMPAIGN_VERSION) ไปแล้ว
+}
 export interface MeResponse { user: PublicUser | null }
 export interface LineLoginBody { idToken: string }
 export interface RedeemBody { code: string }
@@ -143,6 +152,11 @@ export const FEEDBACK_TAGS = [
   'ราคา/บัตรเติมเงิน',
   'อื่นๆ',
 ] as const;
+// จำนวนวันที่แถมให้เมื่อส่ง feedback สำเร็จ (รับได้ครั้งเดียวต่อแคมเปญเวอร์ชันเดียว — กันรับซ้ำ)
+export const FEEDBACK_REWARD_DAYS = 1;
+// bump ค่านี้ (เช่น 'v2') เพื่อ: (1) รีเซ็ตเกณฑ์เด้งถามฝั่ง client ให้ทุกคน (submitted/dismiss/cooldown ในเครื่อง)
+// (2) เปิดสิทธิ์รับรางวัล +วันใหม่อีกครั้งให้ทุกคน รวมคนที่เคยส่ง/เคยรับรางวัลเวอร์ชันก่อนหน้าไปแล้ว
+export const FEEDBACK_CAMPAIGN_VERSION = 'v1';
 export interface Feedback {
   _id?: string;
   userId: string;
@@ -153,6 +167,7 @@ export interface Feedback {
   createdAt: string;
 }
 export interface FeedbackBody { rating: number; tags?: string[]; text?: string; watchedSeconds?: number }
+export interface FeedbackResponse { ok: true; rewardGranted: boolean; accessExpiresAt?: string }
 // รายการ feedback ฝั่ง admin (แนบชื่อ user; null = user ถูกลบไปแล้ว)
 export interface FeedbackListItem {
   id: string;

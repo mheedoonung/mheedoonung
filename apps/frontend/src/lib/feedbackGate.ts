@@ -1,13 +1,21 @@
 // เกณฑ์เด้งถาม feedback — เก็บทุกอย่างใน localStorage ฝั่ง client ล้วน
 // กติกา: ดูสะสม ≥30 นาที + ไม่เคยส่ง + ปัดไม่เกิน 2 ครั้ง (ปัดครั้งแรกเว้น 30 วัน)
-// เทส local: localStorage.setItem('mdn_watch_sec', '9999') แล้ว reload หน้าแรก
+// เทส local: localStorage.setItem(`mdn_watch_sec_${FEEDBACK_CAMPAIGN_VERSION}`, '9999') แล้ว reload หน้าแรก
+//   (ชื่อ key มี version ต่อท้าย — ดู WATCH_KEY ด้านล่าง)
 // ponytail: per-device ไม่ sync ข้ามเครื่อง — ยอมรับ (อย่างแย่ user โดนถามซ้ำบนอีกเครื่อง
-//   ซึ่ง backend มี unique index กันส่งซ้ำอยู่แล้ว)
+//   ซึ่ง backend รับซ้ำได้อยู่แล้ว ไม่มี unique index กันส่งซ้ำ)
+//
+// state ผูกกับ FEEDBACK_CAMPAIGN_VERSION ผ่านชื่อ key เอง: bump ค่านี้ฝั่ง shared เมื่อไหร่ (เช่นเปิดแคมเปญรางวัลใหม่)
+// key เดิมจะไม่ถูกอ่านอีกเลย = ค่าว่างทันทีสำหรับทุกคน (คนที่เคยกดข้าม/เคยส่งไปแล้วโดนถามใหม่หมด)
+// ไม่ต้องลบ key เก่าทิ้ง (ข้อมูลไม่กี่ไบต์ ปล่อยค้างไว้เฉยๆ ไม่มีผล)
+import { FEEDBACK_CAMPAIGN_VERSION } from '@mheedoonung/shared';
 
-const WATCH_KEY = 'mdn_watch_sec';
-const STATE_KEY = 'mdn_feedback';
+// ผูก version เดียวกับ STATE_KEY — bump แคมเปญทีนึง รีเซ็ตทั้งเวลาดูสะสมและ submitted/dismiss พร้อมกัน
+// (ไม่งั้นเวลาดูเก่าที่ค้างจากรอบก่อนจะยังผ่านเกณฑ์ทันทีโดยไม่ต้องดูอะไรใหม่เลย)
+const WATCH_KEY = `mdn_watch_sec_${FEEDBACK_CAMPAIGN_VERSION}`;
+const STATE_KEY = `mdn_feedback_${FEEDBACK_CAMPAIGN_VERSION}`;
 
-const MIN_WATCH_SECONDS = 10 * 60;
+const MIN_WATCH_SECONDS = 15 * 60;
 const DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_DISMISS = 3;
 

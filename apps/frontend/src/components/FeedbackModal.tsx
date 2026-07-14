@@ -1,16 +1,22 @@
 // Modal ขอ feedback จาก user ที่ดูหนังจริง (เด้งจาก HomePage เมื่อเข้าเกณฑ์ใน lib/feedbackGate)
 // ชั้น 1: ดาว 1-5 (บังคับ) / ชั้น 2: chips + ข้อความ (optional) — ปิด/ไว้ทีหลัง = dismiss (จำใน localStorage)
 import { useEffect, useRef, useState } from 'react';
-import { FEEDBACK_TAGS } from '@mheedoonung/shared';
+import { FEEDBACK_REWARD_DAYS, FEEDBACK_TAGS, type FeedbackResponse } from '@mheedoonung/shared';
 import { api } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { getWatchSeconds, markDismissed, markSubmitted } from '../lib/feedbackGate';
+import { celebrate } from '../lib/celebrate';
 
 export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () => void }): JSX.Element | null {
+  const { user, refresh } = useAuth();
+  // เคยรับรางวัลแคมเปญนี้ไปแล้ว (จาก /me) — ห้ามโชว์ว่าจะได้ +วัน ซ้ำ เพราะส่งไปก็ไม่ได้จริง
+  const rewardAlreadyClaimed = user?.feedbackRewardClaimed ?? false;
   const [rating, setRating] = useState(0);
   const [tags, setTags] = useState<Set<string>>(new Set());
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [rewardGranted, setRewardGranted] = useState(false);
   // กันยิง dismiss ตอนปิดหลัง "ส่งสำเร็จ" (ส่งแล้ว server ไม่ถามอีกอยู่แล้ว)
   const sentRef = useRef(false);
 
@@ -45,7 +51,7 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
     if (rating < 1 || sending) return;
     setSending(true);
     try {
-      await api.post('/feedback', {
+      const res = await api.post<FeedbackResponse>('/feedback', {
         rating,
         tags: [...tags],
         text: text.trim() || undefined,
@@ -53,6 +59,12 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
       });
       sentRef.current = true;
       markSubmitted();
+      setRewardGranted(res.rewardGranted);
+      // ได้รางวัล +วัน -> รีเฟรช /me ให้ header อัปเดตวันหมดอายุใหม่ทันที + พลุฉลองแบบเดียวกับเติมบัตรสำเร็จ
+      if (res.rewardGranted) {
+        void refresh();
+        celebrate();
+      }
       setSent(true);
       // โชว์ขอบคุณแป๊บเดียวแล้วปิดเอง
       window.setTimeout(onClose, 1600);
@@ -79,12 +91,19 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
           <>
             <div style={styles.icon}>🐻❤️</div>
             <h2 style={styles.title}>ขอบคุณมากๆ เลย!</h2>
-            <p style={styles.text}>เราจะเอาไปปรับปรุงให้ดีขึ้น</p>
+            <p style={styles.text}>
+              {rewardGranted
+                ? `เราเพิ่มเวลาใช้งานให้ ${FEEDBACK_REWARD_DAYS} วันเป็นของขวัญ 🎉`
+                : 'เราจะเอาไปปรับปรุงให้ดีขึ้น'}
+            </p>
           </>
         ) : (
           <>
             <div style={styles.icon}>🐻</div>
             <h2 style={styles.title}>ดูหนังกับเราเป็นยังไงบ้าง</h2>
+            {!rewardAlreadyClaimed && (
+              <p style={styles.rewardHint}>ให้ความเห็น รับเวลาใช้งานฟรี {FEEDBACK_REWARD_DAYS} วัน 🎁</p>
+            )}
             <div style={styles.stars} role="radiogroup" aria-label="ให้คะแนน 1 ถึง 5 ดาว">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -115,6 +134,7 @@ export function FeedbackModal({ open, onClose }: { open: boolean; onClose: () =>
                     </button>
                   ))}
                 </div>
+                <p style={styles.encourageHint}>ความคิดเห็นของคุณมีค่าสำหรับเรามากๆ 💬</p>
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -177,6 +197,18 @@ const styles = {
     lineHeight: 1,
   },
   hint: { margin: '0 0 8px', color: '#666', fontSize: 13 },
+  rewardHint: {
+    margin: '0 0 14px',
+    color: '#c2410c',
+    fontSize: 14,
+    fontWeight: 700 as const,
+  },
+  encourageHint: {
+    margin: '0 0 8px',
+    color: '#4f46e5',
+    fontSize: 13,
+    fontWeight: 600 as const,
+  },
   chips: {
     display: 'flex',
     flexWrap: 'wrap' as const,

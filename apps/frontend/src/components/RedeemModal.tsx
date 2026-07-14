@@ -1,10 +1,10 @@
 // Modal เติมเวลาดูหนัง — เปิดจากปุ่มในหน้าหลัก (เติมได้ตลอด ไม่ต้องรอสิทธิ์หมด)
 // backend สะสมเวลาให้เอง: max(now, วันหมดอายุเดิม) + วันของบัตร (ดู card.service.ts)
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import confetti from 'canvas-confetti';
 import type { RedeemBody, RedeemResponse } from '@mheedoonung/shared';
 import { api, ApiClientError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { celebrate } from '../lib/celebrate';
 
 // map รหัส error จาก backend -> ข้อความภาษาไทย (ใช้ร่วมกับ RedeemPage)
 export function redeemErrorMessage(err: unknown): string {
@@ -23,18 +23,6 @@ export function redeemErrorMessage(err: unknown): string {
     }
   }
   return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
-}
-
-// พลุฉลอง — ยิงจากซ้าย+ขวาสวนเข้ากลางสั้น ๆ (canvas วาดบน body เอง อยู่ต่อได้แม้ปิด modal)
-function celebrate(): void {
-  const colors = ['#f94144', '#f8961e', '#f9c74f', '#90be6d', '#43aa8b', '#577590', '#e56399'];
-  const end = Date.now() + 700;
-  confetti({ particleCount: 80, spread: 80, startVelocity: 45, origin: { y: 0.7 }, colors });
-  (function frame() {
-    confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors });
-    confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors });
-    if (Date.now() < end) requestAnimationFrame(frame);
-  })();
 }
 
 export function RedeemModal({ open, onClose }: { open: boolean; onClose: () => void }): JSX.Element | null {

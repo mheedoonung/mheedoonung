@@ -11,6 +11,7 @@ import type {
 } from '@mheedoonung/shared';
 import { collections } from '../db/mongo';
 import { generateCardCode, normalizeCardCode } from '../lib/crypto';
+import { extendUserAccess } from '../lib/accessTime';
 
 // 1 วัน = มิลลิวินาที (ใช้คำนวณ accessExpiresAt แบบสะสม)
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -177,54 +178,20 @@ export async function redeemCard(
   }
 
   const daysAdded = result.days;
-  const updatedAtIso = new Date(nowMs).toISOString();
 
-  // ---- สะสม accessExpiresAt ของ user แบบ atomic ฝั่ง DB ----
+  // ---- สะสม accessExpiresAt ของ user แบบ atomic ฝั่ง DB (ดู lib/accessTime) ----
   // ห้ามอ่านค่า user.accessExpiresAt จาก session (snapshot/stale) มาคำนวณแล้ว $set ทับ
   // เพราะถ้า user เดียวกัน redeem สองใบพร้อมกัน ทั้งคู่จะอ่านฐานเดิมเท่ากันแล้วเขียนทับกัน
   // (lost update) -> วันของบัตรใบหนึ่งหายไป ทั้งที่บัตรถูก mark redeemed ไปแล้ว
-  //
-  // ใช้ aggregation-pipeline update เพื่อให้ base อ่านจาก '$accessExpiresAt' ปัจจุบันใน DB:
-  //   newAccessExpiresAt = toString( toDate( add(
-  //       max( nowMs, ifNull(toLong(toDate('$accessExpiresAt')), 0) ),
-  //       daysAdded*DAY_MS
-  //   ) ) )
-  // และใช้ returnDocument:'after' เพื่อคืนค่าที่ถูกต้องจริงกลับไปใน RedeemResponse
   const addedMs = daysAdded * DAY_MS;
-  const updated = await collections.users.findOneAndUpdate(
-    { _id: new ObjectId(userId) } as any,
-    [
-      {
-        $set: {
-          accessExpiresAt: {
-            $toString: {
-              $toDate: {
-                $add: [
-                  {
-                    // ฐาน = max(now, เดิมถ้ายังไม่หมด) — ถ้า accessExpiresAt เป็น null ให้ใช้ 0
-                    $max: [
-                      nowMs,
-                      { $ifNull: [{ $toLong: { $toDate: '$accessExpiresAt' } }, 0] },
-                    ],
-                  },
-                  addedMs,
-                ],
-              },
-            },
-          },
-          updatedAt: updatedAtIso,
-        },
-      },
-    ],
-    { returnDocument: 'after' },
-  );
+  const accessExpiresAt = await extendUserAccess({ _id: new ObjectId(userId) }, addedMs);
 
-  // หลัง update ด้วย returnDocument:'after' ควรได้ doc กลับมาเสมอ (user มีอยู่จริง)
-  if (!updated || !updated.accessExpiresAt) {
+  // ไม่ควรเป็น null (user มีอยู่จริงแน่ ๆ จาก session) — เผื่อไว้กันพัง
+  if (!accessExpiresAt) {
     throw new Error('redeem_update_user_failed');
   }
 
-  return { accessExpiresAt: updated.accessExpiresAt, daysAdded };
+  return { accessExpiresAt, daysAdded };
 }
 
 // แปลง doc บัตรจาก DB (_id เป็น ObjectId) -> CardListItem (id เป็น string)
